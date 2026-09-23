@@ -230,61 +230,52 @@ class CandleProvider {
 
   async fetchHistorical() {
     const errors = [];
-    
-    if (this.exchangeName === 'hyperliquid') {
-      // Hyperliquid REST API works - fetch historical data
-      console.log('Fetching historical data for Hyperliquid...');
-    }
-    
-    // Process in parallel batches to speed up startup
-    const batchSize = 3;
-    const tasks = [];
-    
     for (const symbol of this.symbols) {
       for (const timeframe of this.timeframes) {
         const key = `${symbol}:${timeframe}`;
-        tasks.push({ symbol, timeframe, key });
-      }
-    }
-    
-    for (let i = 0; i < tasks.length; i += batchSize) {
-      const batch = tasks.slice(i, i + batchSize);
-      await Promise.all(batch.map(async ({ symbol, timeframe, key }) => {
-        let retries = 3;
-        while (retries > 0) {
+        let success = false;
+        let retries = 20;
+
+        while (retries > 0 && !success) {
           try {
-            const interval = this.exchangeName === 'hyperliquid' ? getHyperliquidInterval(timeframe) : getCcxtInterval(timeframe);
+            const interval = this.exchangeName === 'hyperliquid'
+              ? getHyperliquidInterval(timeframe)
+              : getCcxtInterval(timeframe);
+
             const candles = await this.exchange.fetchOHLCV(symbol, interval, undefined, this.limit);
             const ordered = candles.slice(0, candles.length - 1);
             this.store.set(key, ordered);
             const last = ordered[ordered.length - 1];
             this.currentCandles.set(key, last ? [...last] : null);
-            return; // Success
+            success = true;
+
+            if (typeof this.onScreenerUpdate === 'function') {
+              const closedBars = this.getClosedCandles(symbol, timeframe);
+              this.onScreenerUpdate(symbol, timeframe, closedBars);
+            }
           } catch (error) {
-            const isRateLimit = error.message?.includes('429') || error.message?.includes('RateLimitExceeded') || error.message?.includes('Too Many Requests');
+            const isRateLimit = error.message?.includes('429')
+              || error.message?.includes('RateLimitExceeded')
+              || error.message?.includes('Too Many Requests');
+
             if (isRateLimit && retries > 1) {
               retries--;
-              const delay = 1000 * (4 - retries); // 1s, 2s, 3s
-              console.log(`Rate limited for ${key}, retrying in ${delay}ms (${retries} retries left)`);
+              const delay = 1000 * (21 - retries);
               await this.sleep(delay);
               continue;
             }
             logger.error(`Historical fetch failed for ${key}:`, error.message);
-            console.error(`Historical fetch failed for ${key}:`, error);
             errors.push({ symbol, timeframe, error: error.message });
             break;
           }
         }
-      }));
-      
-      // Delay between batches to avoid rate limits
-      if (i + batchSize < tasks.length) {
-        await this.sleep(500);
       }
     }
-    
+
     if (errors.length > 0) {
-      logger.warn(`Historical fetch completed with ${errors.length} errors`);
+      logger.warn(`Sequential historical fill completed with ${errors.length} errors`);
+    } else {
+      logger.warn(`Sequential historical fill completed with 0 errors`);
     }
   }
 

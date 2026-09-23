@@ -336,7 +336,6 @@ function checkEWT(candles, params = {}) {
       }
     };
 
-    logger.info(`EWT check: signal=${signal}, met=${met}, price=${result.price}, sl=${sl_price}`);
     return result;
 
   } catch (error) {
