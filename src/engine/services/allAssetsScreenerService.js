@@ -33,6 +33,7 @@ class AllAssetsScreenerService {
   static mazscoreTfSubscribersCacheTs = 0;
   static mazscoreAssetSubscribersCache = null;
   static mazscoreAssetSubscribersCacheTs = 0;
+  static MAZSCORE_ASSET_CACHE_MS = 30 * 1000;
   static lastMAZScoreAvg = null;
   static MAZSCORE_ALERT_THRESHOLD = 0.5;
   static nonMetalSymbols = null;
@@ -142,6 +143,28 @@ class AllAssetsScreenerService {
     for (const row of this.mazscoreTfSubscribersCache) {
       hasAny = true;
       if (row.timeframe === timeframe) userIds.add(row.user_id);
+    }
+    return { userIds: Array.from(userIds), hasAnySubscriptions: hasAny };
+  }
+
+  static async _getMazscoreAssetSubscribers(symbol, timeframe) {
+    if (!this.db) return { userIds: [], hasAnySubscriptions: false };
+    const now = Date.now();
+    if (!this.mazscoreAssetSubscribersCache || now - this.mazscoreAssetSubscribersCacheTs > this.MAZSCORE_ASSET_CACHE_MS) {
+      try {
+        const rows = await this.db.getEnabledMazscoreAssetSubscribers();
+        this.mazscoreAssetSubscribersCache = rows;
+        this.mazscoreAssetSubscribersCacheTs = now;
+      } catch (err) {
+        logger.error('Failed to load MAZScore Asset subscribers:', err.message);
+        return { userIds: [], hasAnySubscriptions: false };
+      }
+    }
+    const userIds = new Set();
+    let hasAny = false;
+    for (const row of this.mazscoreAssetSubscribersCache) {
+      hasAny = true;
+      if (row.symbol === symbol && row.timeframe === timeframe) userIds.add(row.user_id);
     }
     return { userIds: Array.from(userIds), hasAnySubscriptions: hasAny };
   }
