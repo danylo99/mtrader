@@ -25,20 +25,12 @@
             "display": "XRPUSDC.P"
         },
         {
-            "symbol": "ZEC/USDC:USDC",
-            "display": "ZECUSDC.P"
-        },
-        {
             "symbol": "HYPE/USDC:USDC",
             "display": "HYPEUSDC.P"
         },
         {
             "symbol": "DOGE/USDC:USDC",
             "display": "DOGEUSDC.P"
-        },
-        {
-            "symbol": "ONDO/USDC:USDC",
-            "display": "ONDOUSDC.P"
         },
         {
             "symbol": "ADA/USDC:USDC",
@@ -49,10 +41,6 @@
             "display": "NEARUSDC.P"
         },
         {
-            "symbol": "ENA/USDC:USDC",
-            "display": "ENAUSDC.P"
-        },
-        {
             "symbol": "AAVE/USDC:USDC",
             "display": "AAVEUSDC.P"
         },
@@ -61,32 +49,12 @@
             "display": "SUIUSDC.P"
         },
         {
-            "symbol": "WLD/USDC:USDC",
-            "display": "WLDUSDC.P"
-        },
-        {
             "symbol": "LINK/USDC:USDC",
             "display": "LINKUSDC.P"
         },
         {
-            "symbol": "XLM/USDC:USDC",
-            "display": "XLMUSDC.P"
-        },
-        {
-            "symbol": "TAO/USDC:USDC",
-            "display": "TAOUSDC.P"
-        },
-        {
-            "symbol": "LTC/USDC:USDC",
-            "display": "LTCUSDC.P"
-        },
-        {
             "symbol": "BNB/USDC:USDC",
             "display": "BNBUSDC.P"
-        },
-        {
-            "symbol": "FARTCOIN/USDC:USDC",
-            "display": "FARTCOINUSDC.P"
         },
         {
             "symbol": "UNI/USDC:USDC",
@@ -95,30 +63,6 @@
         {
             "symbol": "AVAX/USDC:USDC",
             "display": "AVAXUSDC.P"
-        },
-        {
-            "symbol": "KAITO/USDC:USDC",
-            "display": "KAITOUSDC.P"
-        },
-        {
-            "symbol": "VIRTUAL/USDC:USDC",
-            "display": "VIRTUALUSDC.P"
-        },
-        {
-            "symbol": "DOT/USDC:USDC",
-            "display": "DOTUSDC.P"
-        },
-        {
-            "symbol": "LDO/USDC:USDC",
-            "display": "LDOUSDC.P"
-        },
-        {
-            "symbol": "XMR/USDC:USDC",
-            "display": "XMRUSDC.P"
-        },
-        {
-            "symbol": "BCH/USDC:USDC",
-            "display": "BCHUSDC.P"
         },
         {
             "symbol": "INJ/USDC:USDC",
@@ -133,52 +77,8 @@
             "display": "ARBUSDC.P"
         },
         {
-            "symbol": "TIA/USDC:USDC",
-            "display": "TIAUSDC.P"
-        },
-        {
-            "symbol": "TRUMP/USDC:USDC",
-            "display": "TRUMPUSDC.P"
-        },
-        {
-            "symbol": "WIF/USDC:USDC",
-            "display": "WIFUSDC.P"
-        },
-        {
-            "symbol": "JTO/USDC:USDC",
-            "display": "JTOUSDC.P"
-        },
-        {
-            "symbol": "PENGU/USDC:USDC",
-            "display": "PENGUUSDC.P"
-        },
-        {
-            "symbol": "HBAR/USDC:USDC",
-            "display": "HBARUSDC.P"
-        },
-        {
             "symbol": "TRX/USDC:USDC",
             "display": "TRXUSDC.P"
-        },
-        {
-            "symbol": "APT/USDC:USDC",
-            "display": "APTUSDC.P"
-        },
-        {
-            "symbol": "ZRO/USDC:USDC",
-            "display": "ZROUSDC.P"
-        },
-        {
-            "symbol": "ICP/USDC:USDC",
-            "display": "ICPUSDC.P"
-        },
-        {
-            "symbol": "JUP/USDC:USDC",
-            "display": "JUPUSDC.P"
-        },
-        {
-            "symbol": "CRV/USDC:USDC",
-            "display": "CRVUSDC.P"
         },
         {
             "symbol": "SEI/USDC:USDC",
@@ -189,136 +89,8 @@
             "display": "ATOMUSDC.P"
         },
         {
-            "symbol": "RENDER/USDC:USDC",
-            "display": "RENDERUSDC.P"
-        },
-        {
-            "symbol": "DASH/USDC:USDC",
-            "display": "DASHUSDC.P"
-        },
-        {
-            "symbol": "EIGEN/USDC:USDC",
-            "display": "EIGENUSDC.P"
-        },
-        {
             "symbol": "ALGO/USDC:USDC",
             "display": "ALGOUSDC.P"
-        },
-        {
-            "symbol": "ETC/USDC:USDC",
-            "display": "ETCUSDC.P"
-        },
-        {
-            "symbol": "PAXG/USDC:USDC",
-            "display": "PAXGUSDC.P"
-        },
-        {
-            "symbol": "ENS/USDC:USDC",
-            "display": "ENSUSDC.P"
-        },
-        {
-            "symbol": "POL/USDC:USDC",
-            "display": "POLUSDC.P"
-        },
-        {
-            "symbol": "ORDI/USDC:USDC",
-            "display": "ORDIUSDC.P"
-        },
-        {
-            "symbol": "PENDLE/USDC:USDC",
-            "display": "PENDLEUSDC.P"
-        },
-        {
-            "symbol": "STRK/USDC:USDC",
-            "display": "STRKUSDC.P"
-        },
-        {
-            "symbol": "GALA/USDC:USDC",
-            "display": "GALAUSDC.P"
-        },
-        {
-            "symbol": "PYTH/USDC:USDC",
-            "display": "PYTHUSDC.P"
-        },
-        {
-            "symbol": "SPX/USDC:USDC",
-            "display": "SPXUSDC.P"
-        },
-        {
-            "symbol": "POPCAT/USDC:USDC",
-            "display": "POPCATUSDC.P"
-        },
-        {
-            "symbol": "KAS/USDC:USDC",
-            "display": "KASUSDC.P"
-        },
-        {
-            "symbol": "SAND/USDC:USDC",
-            "display": "SANDUSDC.P"
-        },
-        {
-            "symbol": "APE/USDC:USDC",
-            "display": "APEUSDC.P"
-        },
-        {
-            "symbol": "DYDX/USDC:USDC",
-            "display": "DYDXUSDC.P"
-        },
-        {
-            "symbol": "S/USDC:USDC",
-            "display": "SUSDC.P"
-        },
-        {
-            "symbol": "IMX/USDC:USDC",
-            "display": "IMXUSDC.P"
-        },
-        {
-            "symbol": "GMT/USDC:USDC",
-            "display": "GMTUSDC.P"
-        },
-        {
-            "symbol": "MOODENG/USDC:USDC",
-            "display": "MOODENGUSDC.P"
-        },
-        {
-            "symbol": "AXS/USDC:USDC",
-            "display": "AXSUSDC.P"
-        },
-        {
-            "symbol": "W/USDC:USDC",
-            "display": "WUSDC.P"
-        },
-        {
-            "symbol": "STX/USDC:USDC",
-            "display": "STXUSDC.P"
-        },
-        {
-            "symbol": "COMP/USDC:USDC",
-            "display": "COMPUSDC.P"
-        },
-        {
-            "symbol": "BIO/USDC:USDC",
-            "display": "BIOUSDC.P"
-        },
-        {
-            "symbol": "NEO/USDC:USDC",
-            "display": "NEOUSDC.P"
-        },
-        {
-            "symbol": "CAKE/USDC:USDC",
-            "display": "CAKEUSDC.P"
-        },
-        {
-            "symbol": "PNUT/USDC:USDC",
-            "display": "PNUTUSDC.P"
-        },
-        {
-            "symbol": "CELO/USDC:USDC",
-            "display": "CELOUSDC.P"
-        },
-        {
-            "symbol": "MEME/USDC:USDC",
-            "display": "MEMEUSDC.P"
         },
          {
             "symbol": "XYZ-SILVER/USDC:USDC",
