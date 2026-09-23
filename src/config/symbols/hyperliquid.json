@@ -321,13 +321,26 @@
             "display": "MEMEUSDC.P"
         },
          {
-            "symbol": "SILVER/USDC:USDC",
+            "symbol": "XYZ-SILVER/USDC:USDC",
             "display": "SILVERUSDC.P"
         },
          {
-            "symbol": "GOLD/USDC:USDC",
+            "symbol": "XYZ-GOLD/USDC:USDC",
             "display": "GOLDUSDC.P"
-        }
+        },
+    {
+      "symbol": "XYZ-JPY/USDC:USDC",
+      "display": "JPY"
+    },
+    {
+      "symbol": "XYZ-EUR/USDC:USDC",
+      "display": "EUR"
+    },
+    {
+      "symbol": "XYZ-SP500/USDC:USDC",
+      "display": "SP500"
+    }
+
    ]
 
  
