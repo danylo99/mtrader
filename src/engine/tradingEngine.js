@@ -7,6 +7,7 @@ class TradingEngine {
   constructor() {
     this.db = getDatabaseManager();
     this.telegramService = new TelegramService(this.db);
+    this.candleProviderManager = null;
     this.isInitialized = false;
     this.stats = {
       activeSetupsProcessed: 0,
@@ -24,8 +25,12 @@ class TradingEngine {
       await ExchangeServiceManager.initialize(this.db);
       logger.info('Trading engine initialized');
 
-      // CandleProvider runs as independent standalone service
-      // No CandleProvider initialization here
+      // Initialize CandleProviderManager (HTTP client for ScreenerCandleProvider API)
+      const CandleProviderManager = require('./services/candleProviderManager');
+      this.candleProviderManager = new CandleProviderManager();
+      await this.candleProviderManager.initialize(this.db);
+
+      // No CandleProvider refresh needed — data is live via ScreenerCandleProvider WebSocket
 
       this.isInitialized = true;
       return true;
@@ -87,6 +92,10 @@ class TradingEngine {
     }
   }
 
+  getCandleProviderManager() {
+    return this.candleProviderManager;
+  }
+
   async getExchangeService(accountId, exchange, apiKeyEnc, apiSecretEnc, isTestnet) {
     const ExchangeServiceManager = require('./services/exchangeServiceManager');
     return ExchangeServiceManager.getOrCreate(accountId, exchange, apiKeyEnc, apiSecretEnc, isTestnet);
@@ -111,6 +120,9 @@ class TradingEngine {
 
   async cleanup() {
     try {
+      if (this.candleProviderManager) {
+        this.candleProviderManager.clear();
+      }
       await this.telegramService.flush();
       await this.db.disconnect();
       require('./services/exchangeServiceManager').clear();

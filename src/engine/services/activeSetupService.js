@@ -36,7 +36,14 @@ class ActiveSetupService {
 
   static async checkExitCondition(ctx, setup, exchangeService) {
     try {
-      const candles = await exchangeService.getCandles(setup.symbol, setup.exit_indicator_tf, 1500);
+      let candles = null;
+      const cpManager = ctx.getCandleProviderManager();
+      if (cpManager) {
+        candles = await cpManager.getClosedCandles(setup.exchange, setup.symbol, setup.exit_indicator_tf);
+      }
+      if (!candles) {
+        candles = await exchangeService.getCandles(setup.symbol, setup.exit_indicator_tf, 1500);
+      }
       const parsedCandles = CandleUtils.parseExchangeCandles(candles);
       const closedBars = CandleUtils.filterClosedBars(parsedCandles, setup.exit_indicator_tf);
 
@@ -260,7 +267,14 @@ static async checkBreakEven(ctx, setup, exchangeService) {
       const slOrder = orders.find(o => o.order_type === 'sl');
       if (!slOrder) return null;
 
-      const candles = await exchangeService.getCandles(setup.symbol, 'm5', 1500);
+      let candles = null;
+      const cpManager = ctx.getCandleProviderManager();
+      if (cpManager) {
+        candles = await cpManager.getClosedCandles(setup.exchange, setup.symbol, 'm5');
+      }
+      if (!candles) {
+        candles = await exchangeService.getCandles(setup.symbol, 'm5', 1500);
+      }
       const parsedCandles = CandleUtils.parseExchangeCandles(candles);
       const closedBars = CandleUtils.filterClosedBars(parsedCandles, 'm5');
 

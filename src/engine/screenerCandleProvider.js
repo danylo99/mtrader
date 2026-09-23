@@ -18,6 +18,7 @@ const logger = require('./logger');
 const Config = require('./config');
 const fs = require('fs');
 const path = require('path');
+const express = require('express');
 
 class ScreenerCandleProvider {
   constructor() {
@@ -25,6 +26,7 @@ class ScreenerCandleProvider {
     this.telegramService = new TelegramService(this.db);
     this.candleProvider = null;
     this.isRunning = false;
+    this.httpServer = null;
   }
 
   loadSymbols() {
@@ -106,7 +108,7 @@ class ScreenerCandleProvider {
         exchange: exchange,
         symbols,
         timeframes,
-        limit: 1000,
+        limit: 1501,
         onUpdate: (symbol, timeframe, candle) => {
           // Optional: log candle updates
           //logger.debug(`Candle closed for screener: ${symbol} ${timeframe}`);
@@ -143,7 +145,10 @@ class ScreenerCandleProvider {
       
       // Initialize MA Z-Score values from historical data
       await AllAssetsScreenerService.populateMAZScoreSnapshot(this.candleProvider);
-      
+
+      // Start HTTP candle API server (buffer guaranteed populated after waitForHistorical)
+      this.startCandleApiServer();
+
     } catch (error) {
       logger.error('Failed to start Screener CandleProvider:', error);
       await this.stop();
@@ -151,10 +156,42 @@ class ScreenerCandleProvider {
     }
   }
 
+startCandleApiServer() {
+    const app = express();
+    const port = process.env.CANDLE_API_PORT || 3004;
+
+    app.get('/candles/:symbol/:timeframe', (req, res) => {
+      const { symbol, timeframe } = req.params;
+      if (!symbol || !timeframe) {
+        return res.status(404).json({ error: 'Missing symbol or timeframe' });
+      }
+      const candles = this.candleProvider.getClosedCandles(symbol, timeframe);
+      res.json(candles);
+    });
+
+    this.httpServer = app.listen(port, () => {
+      logger.info(`Candle API server listening on port ${port}`);
+    });
+  }
+
   async stop() {
     logger.info('Stopping Screener CandleProvider service...');
     this.isRunning = false;
-    
+
+    if (this.httpServer) {
+      try {
+        await new Promise((resolve, reject) => {
+          this.httpServer.close((err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+        logger.info('Candle API server stopped');
+      } catch (error) {
+        logger.error('Error stopping Candle API server:', error);
+      }
+    }
+
     if (this.candleProvider) {
       try {
         await this.candleProvider.stop();
