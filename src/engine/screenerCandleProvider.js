@@ -135,6 +135,9 @@ class ScreenerCandleProvider {
       logger.info(`ℹ️  Populating initial screener snapshot...`);
 
       // Populate initial snapshot so UI has data immediately
+      // Wait for historical data to complete first (ensures enough bars)
+      await this.candleProvider.waitForHistorical();
+      
       // Initialize SuperTrend directions from historical data
       await AllAssetsScreenerService.populateInitialSnapshot(this.candleProvider);
       

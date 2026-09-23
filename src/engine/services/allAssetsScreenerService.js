@@ -492,7 +492,7 @@ exchange: this.currentExchange,
     const symbolsConfigPath = path.resolve(getProjectRoot(), `config/symbols/${this.currentExchange}.json`);
     const symbolsConfig = JSON.parse(fs.readFileSync(symbolsConfigPath, 'utf8'));
     const allSymbols = new Set(symbolsConfig.symbols.map(s => s.symbol));
-    this.nonMetalSymbols = new Set([...allSymbols].filter(s => !METAL_SYMBOLS.has(s)));
+    this.nonMetalSymbols = new Set([...allSymbols].filter(s => !METAL_SYMBOLS.has(s) && !s.startsWith('XYZ')));
     return this.nonMetalSymbols;
   }
 

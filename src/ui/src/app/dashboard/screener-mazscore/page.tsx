@@ -13,7 +13,16 @@ const METAL_SYMBOLS = new Set([
   'XAUT/USDT:USDT',
   'XAGUSD/USD:USD',
   'GOLD/USDT:USDT',
+  'PAXG/USDC:USDC',
+  'XAU/USDC:USDC',
+  'XAG/USDC:USDC',
+  'XAUT/USDC:USDC',
+  'GOLD/USDC:USDC',
 ]);
+
+function isMetal(symbol: string) {
+  return METAL_SYMBOLS.has(symbol) || symbol.startsWith('XYZ');
+}
 
 function Dot({ extreme }: { extreme: string | null | undefined }) {
   if (!extreme) return null;
@@ -163,11 +172,11 @@ export default function MAZScoreScreenerPage() {
   };
 
   const cryptoSymbols = Object.keys(data)
-    .filter(s => !METAL_SYMBOLS.has(s))
+    .filter(s => !isMetal(s))
     .sort(sortSymbols);
 
   const metalSymbols = Object.keys(data)
-    .filter(s => METAL_SYMBOLS.has(s))
+    .filter(s => isMetal(s))
     .sort(sortSymbols);
 
   const cryptoAvg = TF_ORDER.reduce<Record<string, number | null>>((acc, tf) => {

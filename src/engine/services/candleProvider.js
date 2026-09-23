@@ -155,6 +155,7 @@ class CandleProvider {
     this.isRunning = false;
     this.tasks = [];
     this.wsTimeout = null;
+    this.historicalPromise = null;
   }
 
   async start() {
@@ -172,8 +173,14 @@ class CandleProvider {
       }
 
       await this.filterPerpSymbols();
-      await this.fetchHistorical();
+      
+      // Start WebSocket first for real-time data
       await this.startWebSocket();
+      
+      // Fetch historical data in background (non-blocking)
+      this.historicalPromise = this.fetchHistorical().catch(err => {
+        logger.error('Background historical fetch failed:', err.message);
+      });
 
       this.isRunning = true;
       const combos = this.symbols.length * this.timeframes.length;
@@ -225,30 +232,57 @@ class CandleProvider {
     const errors = [];
     
     if (this.exchangeName === 'hyperliquid') {
-      // For Hyperliquid, skip historical fetch for now since REST API might not work
-      // WebSocket will provide real-time data
-      console.log('Skipping historical fetch for Hyperliquid');
-      return;
+      // Hyperliquid REST API works - fetch historical data
+      console.log('Fetching historical data for Hyperliquid...');
     }
+    
+    // Process in parallel batches to speed up startup
+    const batchSize = 3;
+    const tasks = [];
     
     for (const symbol of this.symbols) {
       for (const timeframe of this.timeframes) {
         const key = `${symbol}:${timeframe}`;
-        try {
-          const interval = this.exchangeName === 'hyperliquid' ? getHyperliquidInterval(timeframe) : getCcxtInterval(timeframe);
-          const candles = await this.exchange.fetchOHLCV(symbol, interval, undefined, this.limit);
-          const ordered = candles.slice(0, candles.length - 1);
-          this.store.set(key, ordered);
-          const last = ordered[ordered.length - 1];
-          this.currentCandles.set(key, last ? [...last] : null);
-          await this.sleep(200);
-        } catch (error) {
-          logger.error(`Historical fetch failed for ${key}:`, error.message);
-          console.error(`Historical fetch failed for ${key}:`, error);
-          errors.push({ symbol, timeframe, error: error.message });
-        }
+        tasks.push({ symbol, timeframe, key });
       }
     }
+    
+    for (let i = 0; i < tasks.length; i += batchSize) {
+      const batch = tasks.slice(i, i + batchSize);
+      await Promise.all(batch.map(async ({ symbol, timeframe, key }) => {
+        let retries = 3;
+        while (retries > 0) {
+          try {
+            const interval = this.exchangeName === 'hyperliquid' ? getHyperliquidInterval(timeframe) : getCcxtInterval(timeframe);
+            const candles = await this.exchange.fetchOHLCV(symbol, interval, undefined, this.limit);
+            const ordered = candles.slice(0, candles.length - 1);
+            this.store.set(key, ordered);
+            const last = ordered[ordered.length - 1];
+            this.currentCandles.set(key, last ? [...last] : null);
+            return; // Success
+          } catch (error) {
+            const isRateLimit = error.message?.includes('429') || error.message?.includes('RateLimitExceeded') || error.message?.includes('Too Many Requests');
+            if (isRateLimit && retries > 1) {
+              retries--;
+              const delay = 1000 * (4 - retries); // 1s, 2s, 3s
+              console.log(`Rate limited for ${key}, retrying in ${delay}ms (${retries} retries left)`);
+              await this.sleep(delay);
+              continue;
+            }
+            logger.error(`Historical fetch failed for ${key}:`, error.message);
+            console.error(`Historical fetch failed for ${key}:`, error);
+            errors.push({ symbol, timeframe, error: error.message });
+            break;
+          }
+        }
+      }));
+      
+      // Delay between batches to avoid rate limits
+      if (i + batchSize < tasks.length) {
+        await this.sleep(500);
+      }
+    }
+    
     if (errors.length > 0) {
       logger.warn(`Historical fetch completed with ${errors.length} errors`);
     }
@@ -315,10 +349,14 @@ class CandleProvider {
 
   handleHyperliquidWsCandle(key, raw, confirm) {
     if (!confirm) return; // Only process confirmed candles
-    const [symbol, timeframe] = key.split(':');
+    const lastColon = key.lastIndexOf(':');
+    const symbol = key.slice(0, lastColon);
+    const timeframe = key.slice(lastColon + 1);
     const current = this.currentCandles.get(key);
 
     if (!current) {
+      // First candle for this key - initialize store with it
+      this.store.set(key, [raw]);
       this.currentCandles.set(key, raw);
       return;
     }
@@ -352,6 +390,12 @@ class CandleProvider {
       result.set(key, arr.slice());
     }
     return result;
+  }
+
+  async waitForHistorical() {
+    if (this.historicalPromise) {
+      await this.historicalPromise;
+    }
   }
 
   async stop() {
