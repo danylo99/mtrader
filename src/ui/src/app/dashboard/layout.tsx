@@ -63,7 +63,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/dashboard/screener-supertrend', label: 'SuperTrend', icon: Search },
+    { href: '/dashboard/screener-supertrend', label: 'RollingSuperTrend2', icon: Search },
     { href: '/dashboard/screener-ew', label: 'EW Signal', icon: Search },
     { href: '/dashboard/screener-mazscore', label: 'MA Z-Score', icon: Search },
     { href: '/dashboard/alarms', label: 'Price Alarms', icon: Bell },

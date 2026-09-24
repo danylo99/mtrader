@@ -76,13 +76,13 @@ class AllAssetsScreenerService {
     this.supertrendAssetSubscribersCacheTs = 0;
   }
 
-  static _stMinTimeframes = new Set(['m15', 'm30', 'h1', 'h2', 'h4', 'd1', 'w1']);
+  static _stMinTimeframes = new Set(['m5', 'm15', 'm30', 'h1', 'h2', 'h4', 'd1', 'w1']);
 
    static async processClosedCandle(symbol, timeframe, closedBars) {
-    if (closedBars.length < 20) return;
+    if (closedBars.length < 30) return;
 
     const parsedBars = CandleUtils.parseExchangeCandles(closedBars);
-    if (parsedBars.length < 20) return;
+    if (parsedBars.length < 30) return;
 
     try {
       if (this._stMinTimeframes.has(timeframe)) {
@@ -191,31 +191,29 @@ class AllAssetsScreenerService {
     return { userIds: Array.from(userIds), hasAnySubscriptions: hasAny };
   }
 
-  static async _updateSTDirection(symbol, timeframe, bars) {
-    const highs = bars.map(c => c.high);
-    const lows = bars.map(c => c.low);
-    const closes = bars.map(c => c.close);
+static async _updateSTDirection(symbol, timeframe, bars) {
+    const result = IndicatorService.checkCondition('rollingsupertrend2', bars, { period: 10, multiplier: 3, rollingPeriod: 16 });
 
-    const { direction } = _calculateSuperTrendAligned(highs, lows, closes, 10, 3);
-    let lastDir = 0;
-    for (let i = direction.length - 1; i >= 0; i--) {
-      if (direction[i] !== 0) { lastDir = direction[i]; break; }
+    if (result.error) {
+      logger.warn(`RollingSuperTrend2 error for ${symbol} ${timeframe}: ${result.error}`);
+      return;
     }
-    const trend = lastDir === -1 ? 'bullish' : lastDir === 1 ? 'bearish' : null;
+
+    const trend = result.details.trend;
 
     const key = `${symbol}:${timeframe}`;
     const lastWritten = this.lastSTWritten.get(key);
     const lastSignal = this.lastSupertrendSignals.get(key);
 
     if (trend !== lastWritten) {
-      await this.db.upsertScreenerSnapshot(symbol, timeframe, 'supertrend', trend);
+      await this.db.upsertScreenerSnapshot(symbol, timeframe, 'rollingsupertrend2', trend);
       this.lastSTWritten.set(key, trend);
     }
 
     // Send alert if trend changed (including to/from null)
     if (lastSignal !== undefined && trend !== lastSignal && trend !== null && this.telegramService) {
       const { userIds: subscribers, hasAnySubscriptions } = await this._getSupertrendSubscribers(symbol, timeframe);
-      
+
       if (subscribers.length > 0) {
         const lastBar = bars[bars.length - 1];
         const price = lastBar ? lastBar.close : 0;
@@ -224,7 +222,7 @@ class AllAssetsScreenerService {
         const payload = {
           symbol,
           timeframe,
-          indicatorType: 'SUPERTREND',
+          indicatorType: 'ROLLINGSUPERTREND2',
           signal: trend,
           price,
           exchange: 'bybit',
@@ -236,7 +234,7 @@ class AllAssetsScreenerService {
           await this.telegramService.sendNotification(userId, 'screener_reversal', payload);
         }
 
-        logger.info(`SuperTrend alert sent: ${symbol} ${timeframe} ${trend}, price=${price}`);
+        logger.info(`RollingSuperTrend2 alert sent: ${symbol} ${timeframe} ${trend}, price=${price}`);
       }
 
       this.lastSupertrendSignals.set(key, trend);
@@ -313,9 +311,9 @@ class AllAssetsScreenerService {
     let count = 0;
 
     for (const [key, candles] of allCandles.entries()) {
-      if (candles.length < 20) continue;
+      if (candles.length < 30) continue;
       const parsed = CandleUtils.parseExchangeCandles(candles);
-      if (parsed.length < 20) continue;
+      if (parsed.length < 30) continue;
 
       const colonIdx = key.lastIndexOf(':');
       const symbol = key.slice(0, colonIdx);
@@ -328,7 +326,7 @@ class AllAssetsScreenerService {
       count++;
     }
 
-    logger.info(`Initialized SuperTrend directions for ${count} symbol/timeframe combinations`);
+    logger.info(`Initialized RollingSuperTrend2 directions for ${count} symbol/timeframe combinations`);
 
     await this._populateEWNulls();
   }

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Bell, BellOff, Save } from 'lucide-react';
 import engineFetch from '@/lib/api';
 
-const TF_ORDER = ['m15', 'h1', 'h4', 'd1', 'w1'];
+const TF_ORDER = ['m5', 'm15', 'h1', 'h4', 'd1', 'w1'];
 
 function SignalDot({ signal }: { signal: string | null }) {
   if (!signal) {
@@ -24,7 +24,7 @@ function SortIcon({ active, direction }: { active: boolean; direction: 'asc' | '
   return direction === 'asc' ? <span className="text-blue-400 ml-1">↑</span> : <span className="text-blue-400 ml-1">↓</span>;
 }
 
-export default function SuperTrendScreenerPage() {
+export default function RollingSuperTrend2ScreenerPage() {
   const [data, setData] = useState<Record<string, Record<string, string | null>>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -128,7 +128,7 @@ export default function SuperTrendScreenerPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-slate-400 text-lg">Loading SuperTrend signals...</div>
+        <div className="text-slate-400 text-lg">Loading RollingSuperTrend2 signals...</div>
       </div>
     );
   }
@@ -145,7 +145,7 @@ export default function SuperTrendScreenerPage() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold text-white flex items-center gap-2">
-          SuperTrend Screener
+          RollingSuperTrend2 Screener
           {anySubscribed ? (
             <Bell className="h-4 w-4 text-blue-400" aria-label="Telegram alerts enabled" />
           ) : (
@@ -164,7 +164,7 @@ export default function SuperTrendScreenerPage() {
         <div className="flex items-center justify-between gap-4 flex-wrap mb-3">
           <div>
             <div className="text-sm font-medium text-white">Telegram alerts per timeframe</div>
-            <div className="text-xs text-slate-400">Get notified on SuperTrend reversals for the selected timeframes and assets.</div>
+            <div className="text-xs text-slate-400">Get notified on RollingSuperTrend2 reversals for the selected timeframes and assets.</div>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             {TF_ORDER.map(tf => (
@@ -220,7 +220,27 @@ export default function SuperTrendScreenerPage() {
                   <SortIcon active={sortBy === tf} direction={sortDir} />
                 </th>
               ))}
-              <th className="sticky right-0 bg-slate-900 z-10 px-3 py-2 text-slate-400 font-medium text-center">Alert</th>
+              <th className="sticky right-0 bg-slate-900 z-10 px-3 py-2 text-slate-400 font-medium text-center">
+                <div className="flex items-center justify-center gap-1">
+                  <span>Alert</span>
+                  <input
+                    type="checkbox"
+                    checked={allSymbols.length > 0 && allSymbols.every(s => !!assetSubs[s])}
+                    ref={el => { if (el) el.indeterminate = allSymbols.some(s => !!assetSubs[s]) && !allSymbols.every(s => !!assetSubs[s]); }}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setAssetSubs(prev => {
+                        const next = { ...prev };
+                        for (const s of allSymbols) next[s] = checked;
+                        return next;
+                      });
+                    }}
+                    disabled={!subsLoaded}
+                    className="h-4 w-4 rounded border-slate-600"
+                    title="Toggle all assets"
+                  />
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>

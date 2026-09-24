@@ -6,7 +6,7 @@ const logger = require('../../logger');
 router.get('/supertrend', async (req, res) => {
   try {
     const db = getDatabaseManager();
-    const rows = await db.getScreenerSnapshots('supertrend');
+    const rows = await db.getScreenerSnapshots('rollingsupertrend2');
     res.json({ success: true, data: rows });
   } catch (error) {
     logger.error('Failed to fetch supertrend directions:', error);
