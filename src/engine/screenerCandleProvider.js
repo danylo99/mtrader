@@ -12,6 +12,7 @@ const CandleProvider = require('./services/candleProvider');
 const AllAssetsScreenerService = require('./services/allAssetsScreenerService');
 const PendingSetupService = require('./services/pendingSetupService');
 const EntryService = require('./services/entryService');
+const ActiveSetupService = require('./services/activeSetupService');
 const TelegramService = require('./services/telegramService');
 const PriceAlarmService = require('./services/priceAlarmService');
 const logger = require('./logger');
@@ -114,12 +115,39 @@ class ScreenerCandleProvider {
           //logger.debug(`Candle closed for screener: ${symbol} ${timeframe}`);
         },
         onScreenerUpdate: async (symbol, timeframe, closedBars) => {
-          // Process all-assets screener (SuperTrend + EW)
-          AllAssetsScreenerService.processClosedCandle(symbol, timeframe, closedBars);
+          // Process all-assets screener (SuperTrend + EW + MA Z-Score)
+          // Skip for m1 to avoid excessive noise from 1-min candles
+          if (timeframe !== 'm1') {
+            AllAssetsScreenerService.processClosedCandle(symbol, timeframe, closedBars);
+          }
           // Process pending setups (must complete before processing entries)
           await PendingSetupService.processItemFromCandle(symbol, timeframe, closedBars);
           // Process triggered setups (runs after pending setups complete)
           EntryService.processItemFromCandle(symbol, timeframe, closedBars);
+          // Process exit conditions for active setups matching this symbol+timeframe
+          try {
+            const activeSetups = await this.db.getActiveSetupsBySymbolTimeframe(symbol, timeframe);
+            if (activeSetups && activeSetups.length > 0) {
+              logger.info(`Processing ${activeSetups.length} active setups for exit check on ${symbol} ${timeframe}`);
+              for (const setup of activeSetups) {
+                try {
+                  const ExchangeServiceManager = require('./services/exchangeServiceManager');
+                  const exchangeService = await ExchangeServiceManager.getOrCreate(
+                    setup.exchange_account_id,
+                    setup.exchange,
+                    setup.api_key_enc,
+                    setup.api_secret_enc,
+                    setup.is_testnet
+                  );
+                  await ActiveSetupService.checkExitCondition(this.db, this.telegramService, setup, exchangeService, closedBars);
+                } catch (err) {
+                  logger.error(`Error checking exit condition for setup #${setup.id}:`, err.message);
+                }
+              }
+            }
+          } catch (err) {
+            logger.error(`Error processing exit conditions for ${symbol} ${timeframe}:`, err.message);
+          }
           // Process user price alarms
           PriceAlarmService.processClosedCandle(symbol, timeframe, closedBars).catch(err => {
             logger.error(`PriceAlarmService error for ${symbol} ${timeframe}:`, err.message);

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Bell, Plus, Trash2, Check, X, Pencil } from 'lucide-react';
 import engineFetch from '@/lib/api';
-import type { PriceAlarm, Timeframe } from '@/lib/types';
+import type { PriceAlarm, Timeframe, ExchangeAccount } from '@/lib/types';
 import SymbolPicker from '@/components/SymbolPicker';
 import { getSymbols } from '@/lib/symbols';
 
@@ -35,6 +35,11 @@ export default function PriceAlarmsPage() {
   const [editError, setEditError] = useState<string | null>(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
 
+  const [accounts, setAccounts] = useState<ExchangeAccount[]>([]);
+  const [selectedExchange, setSelectedExchange] = useState<string>('bybit');
+
+  const exchange = selectedExchange;
+
   const fetchAlarms = useCallback(async () => {
     try {
       const res = await engineFetch('/api/price-alarms');
@@ -50,12 +55,12 @@ export default function PriceAlarmsPage() {
 
   const fetchSymbolDisplays = useCallback(async () => {
     try {
-      const options = await getSymbols('bybit');
+      const options = await getSymbols(exchange);
       const map: Record<string, string> = {};
       for (const o of options) map[o.symbol] = o.display;
       setDisplayBySymbol(map);
     } catch {}
-  }, []);
+  }, [exchange]);
 
   const fetchMe = useCallback(async () => {
     try {
@@ -66,11 +71,24 @@ export default function PriceAlarmsPage() {
     } catch {}
   }, []);
 
+  const fetchAccounts = useCallback(async () => {
+    try {
+      const res = await engineFetch('/api/accounts');
+      if (res.success && Array.isArray(res.data)) {
+        setAccounts(res.data);
+        if (res.data.length > 0) {
+          setSelectedExchange(res.data[0].exchange);
+        }
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
     fetchAlarms();
     fetchSymbolDisplays();
     fetchMe();
-  }, [fetchAlarms, fetchSymbolDisplays, fetchMe]);
+    fetchAccounts();
+  }, [fetchAlarms, fetchSymbolDisplays, fetchMe, fetchAccounts]);
 
   function resetForm() {
     setForm({ ...emptyForm });
@@ -101,6 +119,7 @@ export default function PriceAlarmsPage() {
           timeframe: form.timeframe,
           direction: form.direction,
           price_level: level,
+          exchange,
         }),
       });
       if (!res.success) throw new Error(res.error || 'Failed to create');
@@ -163,6 +182,7 @@ export default function PriceAlarmsPage() {
           timeframe: editForm.timeframe,
           direction: editForm.direction,
           price_level: level,
+          exchange,
         }),
       });
       if (!res.success) throw new Error(res.error || 'Failed to update');
@@ -212,7 +232,7 @@ export default function PriceAlarmsPage() {
               <SymbolPicker
                 value={form.symbol}
                 onChange={(val) => setForm({ ...form, symbol: val })}
-                exchange="bybit"
+                exchange={exchange}
                 placeholder="Select an asset..."
               />
             </div>
@@ -321,7 +341,7 @@ export default function PriceAlarmsPage() {
                         <SymbolPicker
                           value={editForm.symbol}
                           onChange={(val) => setEditForm({ ...editForm, symbol: val })}
-                          exchange="bybit"
+                          exchange={exchange}
                           placeholder="Select an asset..."
                         />
                       ) : (

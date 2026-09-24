@@ -321,6 +321,9 @@ class AllAssetsScreenerService {
       const symbol = key.slice(0, colonIdx);
       const timeframe = key.slice(colonIdx + 1);
 
+      // Skip m1 screener to avoid excessive noise
+      if (timeframe === 'm1') continue;
+
       await this._updateSTDirection(symbol, timeframe, parsed);
       count++;
     }
@@ -539,6 +542,9 @@ exchange: this.currentExchange,
       let count = 0;
       for (const symbol of allSymbols) {
         for (const timeframe of intervals) {
+          // Skip m1 screener to avoid excessive noise
+          if (timeframe === 'm1') continue;
+
           const key = `${symbol}:${timeframe}`;
           const candles = allCandles.get(key);
           if (!candles || candles.length < 20) {

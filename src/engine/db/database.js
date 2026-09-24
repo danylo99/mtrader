@@ -313,6 +313,26 @@ class Database {
     return this.all(sql);
   }
 
+  async getActiveSetupsBySymbolTimeframe(symbol, timeframe) {
+    // Extract base currency for pattern matching
+    let symbolPattern = symbol;
+    if (symbol.includes('/')) {
+      const base = symbol.split('/')[0];
+      symbolPattern = base + '/%';
+    }
+    
+    const sql = `
+      SELECT ts.*, ea.exchange, ea.api_key_enc, ea.api_secret_enc, ea.is_testnet
+      FROM trading_setups ts
+      JOIN exchange_accounts ea ON ts.exchange_account_id = ea.id
+      WHERE ts.status = 'active' 
+        AND ts.symbol LIKE ? 
+        AND ts.exit_indicator_tf = ?
+      ORDER BY ts.created_at ASC
+    `;
+    return this.all(sql, [symbolPattern, timeframe]);
+  }
+
   async updateSetupStatus(setupId, newStatus, updates = {}) {
     const now = new Date().toISOString();
     const updateFields = ['status = ?', 'updated_at = ?'];

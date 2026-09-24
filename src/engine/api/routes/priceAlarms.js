@@ -22,8 +22,8 @@ function loadSymbols(exchange = 'bybit') {
 }
 
 function getExchangeFromRequest(req) {
-  // Try to get exchange from query param, body, or default to bybit for backward compatibility
-  return req.query.exchange || req.body.exchange || 'bybit';
+  // Try to get exchange from query param, body, or default to hyperliquid
+  return req.query.exchange || req.body.exchange || 'hyperliquid';
 }
 
 function validateAlarmPayload(body, exchange) {

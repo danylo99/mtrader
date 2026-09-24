@@ -13,7 +13,7 @@ class ActiveSetupService {
     const positions = await exchangeService.getPositions(setup.symbol);
     if (positions.length === 0 || positions.every(p => parseFloat(p.size) === 0)) {
       logger.info(`Position not found for setup #${setup.id}. Marking as closed.`);
-      await this.closeSetup(ctx, setup, 'Position not found');
+      await this.closeSetup(ctx.db, ctx.telegramService, setup, 'Position not found');
       return;
     }
 
@@ -25,27 +25,16 @@ class ActiveSetupService {
       return;
     }
 
-    if (setup.exit_indicator_type && setup.exit_indicator_tf) {
-      if (TimeUtils.isTriggerTime(setup.exit_indicator_tf)) {
-        await this.checkExitCondition(ctx, updatedSetup, exchangeService);
-      }
-    }
-
     await this.checkBreakEven(ctx, updatedSetup, exchangeService);
   }
 
-  static async checkExitCondition(ctx, setup, exchangeService) {
+  static async checkExitCondition(db, telegramService, setup, exchangeService, closedBars = null) {
     try {
-      let candles = null;
-      const cpManager = ctx.getCandleProviderManager();
-      if (cpManager) {
-        candles = await cpManager.getClosedCandles(setup.exchange, setup.symbol, setup.exit_indicator_tf);
+      if (!closedBars) {
+        const candles = await exchangeService.getCandles(setup.symbol, setup.exit_indicator_tf, 1500);
+        const parsedCandles = CandleUtils.parseExchangeCandles(candles);
+        closedBars = CandleUtils.filterClosedBars(parsedCandles, setup.exit_indicator_tf);
       }
-      if (!candles) {
-        candles = await exchangeService.getCandles(setup.symbol, setup.exit_indicator_tf, 1500);
-      }
-      const parsedCandles = CandleUtils.parseExchangeCandles(candles);
-      const closedBars = CandleUtils.filterClosedBars(parsedCandles, setup.exit_indicator_tf);
 
       if (closedBars.length === 0) return;
 
@@ -78,7 +67,7 @@ class ActiveSetupService {
         }
 
         logger.info(`Exit condition met for setup #${setup.id}`);
-        await this.closePosition(ctx, setup, exchangeService, 'exit_condition');
+        await this.closePosition(db, telegramService, setup, exchangeService, 'exit_condition');
       }
     } catch (error) {
       logger.error(`Error checking exit condition for setup #${setup.id}:`, error);
@@ -304,7 +293,7 @@ static async checkBreakEven(ctx, setup, exchangeService) {
           await exchangeService.cancelOrder(tpOrder.exchange_order_id, setup.symbol);
           await ctx.db.updateOrderStatus(tpOrder.id, 'canceled');
         } catch (error) {
-          logger.error(`Error cancelling TP order ${tpOrder.id} after SL hit for setup #${setup.id}:`, error);
+          logger.error(`Error cancelling TP order ${tpOrder.id} after SL hit for setup #${setup.id}:`, error.message);
         }
       }
 
@@ -328,7 +317,7 @@ static async checkBreakEven(ctx, setup, exchangeService) {
 
       logger.slHit(setup.id, slOrder.price, pnl.netPnl);
 
-      await this.closeSetup(ctx, setup, 'stop_loss_hit', pnl.netPnl);
+      await this.closeSetup(ctx.db, ctx.telegramService, setup, 'stop_loss_hit', pnl.netPnl);
     } catch (error) {
       logger.error(`Error processing SL hit for setup #${setup.id}:`, error);
     }
@@ -348,9 +337,9 @@ static async checkBreakEven(ctx, setup, exchangeService) {
     }
   }
 
-  static async closePosition(ctx, setup, exchangeService, reason) {
+  static async closePosition(db, telegramService, setup, exchangeService, reason) {
     try {
-      const orders = await ctx.db.getOrdersBySetupId(setup.id);
+      const orders = await db.getOrdersBySetupId(setup.id);
       
       // Calculate filled TP quantity
       const filledTpOrders = orders.filter(o => o.order_type.startsWith('tp') && o.status === 'filled');
@@ -394,7 +383,7 @@ static async checkBreakEven(ctx, setup, exchangeService) {
           try {
             const params = order.order_type == 'sl' ? { 'trigger': true } : {}
             await exchangeService.cancelOrder(order.exchange_order_id, setup.symbol, params);
-            await ctx.db.updateOrderStatus(order.id, 'canceled');
+            await db.updateOrderStatus(order.id, 'canceled');
           } catch (error) {
             logger.error(`Error cancelling order ${order.id}:`, error);
           }
@@ -411,7 +400,7 @@ static async checkBreakEven(ctx, setup, exchangeService) {
         pnl = PriceUtils.calculatePnl(setup.entry_price, currentPrice, qtyForPnl, setup.side);
       }
 
-      await this.closeSetup(ctx, setup, reason, pnl ? pnl.netPnl : 0);
+      await this.closeSetup(db, telegramService, setup, reason, pnl ? pnl.netPnl : 0);
       logger.info(`Position closed for setup #${setup.id}: ${reason}`);
     } catch (error) {
       logger.error(`Error closing position for setup #${setup.id}:`, error);
@@ -419,26 +408,33 @@ static async checkBreakEven(ctx, setup, exchangeService) {
     }
   }
 
-  static async closeSetup(ctx, setup, reason, profit = 0) {
+  static async closeSetup(db, telegramService, setup, reason, profit = 0) {
     try {
       const closePayload = {
         closed_at: new Date().toISOString(),
         profit: profit
       };
 
-      await ctx.db.updateSetupStatus(setup.id, 'closed', closePayload);
+      await db.updateSetupStatus(setup.id, 'closed', closePayload);
 
       if (reason === 'exit_condition' && setup.entry_price) {
         let currentPrice = null;
         let pnl = null;
         if (profit !== undefined) {
-          const exchangeService = await ctx.getExchangeService(setup.exchange_account_id, setup.exchange, setup.api_key_enc, setup.api_secret_enc, setup.is_testnet);
+          const ExchangeServiceManager = require('./exchangeServiceManager');
+          const exchangeService = await ExchangeServiceManager.getOrCreate(
+            setup.exchange_account_id,
+            setup.exchange,
+            setup.api_key_enc,
+            setup.api_secret_enc,
+            setup.is_testnet
+          );
           const ticker = await exchangeService.getTicker(setup.symbol);
           currentPrice = parseFloat(ticker.lastPrice);
           pnl = { netPnl: profit };
         }
 
-        await ctx.telegramService.sendNotification(setup.user_id, 'exit_triggered', {
+        await telegramService.sendNotification(setup.user_id, 'exit_triggered', {
           setupId: setup.id,
           symbol: setup.symbol,
           exitIndicatorType: setup.exit_indicator_type,

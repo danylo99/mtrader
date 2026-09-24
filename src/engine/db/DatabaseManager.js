@@ -174,6 +174,10 @@ class DatabaseManager {
     return this.db.getActiveSetups();
   }
 
+  async getActiveSetupsBySymbolTimeframe(symbol, timeframe) {
+    return this.db.getActiveSetupsBySymbolTimeframe(symbol, timeframe);
+  }
+
   async getOrdersBySetupId(setupId) {
     return this.db.getOrdersBySetupId(setupId);
   }
