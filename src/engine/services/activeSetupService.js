@@ -34,12 +34,13 @@ class ActiveSetupService {
         const candles = await exchangeService.getCandles(setup.symbol, setup.exit_indicator_tf, 1500);
         const parsedCandles = CandleUtils.parseExchangeCandles(candles);
         closedBars = CandleUtils.filterClosedBars(parsedCandles, setup.exit_indicator_tf);
+      } else {
+        closedBars = CandleUtils.parseExchangeCandles(closedBars);
       }
 
-      if (closedBars.length === 0) return;
+      if (!closedBars || closedBars.length === 0) return;
 
-      const ticker = await exchangeService.getTicker(setup.symbol);
-      const currentPrice = parseFloat(ticker.lastPrice);
+      const currentPrice = closedBars[closedBars.length - 1].close;
       logger.info(`Checking exit condition for setup #${setup.id} at price ${currentPrice}`);
 
       const exitResult = IndicatorService.checkCondition(
