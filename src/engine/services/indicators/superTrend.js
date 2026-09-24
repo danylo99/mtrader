@@ -21,7 +21,6 @@ function checkSuperTrend(candles, params = {}) {
     }
 
     const result = detectSuperTrendCrossover(nonNull, closes, 'SuperTrend');
-    logger.info(`SuperTrend check: lastST=${result.value}, lastClose=${result.price}, wasBullish=${result.wasBullish}, isBullish=${result.isBullish}, signal=${result.signal}`);
 
     return {
       ...result,
