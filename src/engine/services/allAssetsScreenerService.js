@@ -451,6 +451,7 @@ exchange: this.currentExchange,
         }
       }
     } catch (error) {
+      console.log(error);
       logger.error('MA Z-Score alert check error:', error.message);
     }
   }
