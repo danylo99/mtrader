@@ -344,7 +344,7 @@ static async _updateSTDirection(symbol, timeframe, bars) {
       const path = require('path');
       const fs = require('fs');
       const { getProjectRoot } = require('../config');
-      const symbolsConfigPath = path.resolve(getProjectRoot(), `config/symbols/${this.currentExchange}.json`);
+      const symbolsConfigPath = path.resolve(getProjectRoot(), `src/config/symbols/${this.currentExchange}.json`);
       const symbolsConfig = JSON.parse(fs.readFileSync(symbolsConfigPath, 'utf8'));
       const intervals = symbolsConfig.intervals;
       const symbols = symbolsConfig.symbols.map(s => s.symbol);
@@ -514,7 +514,7 @@ exchange: this.currentExchange,
     const path = require('path');
     const fs = require('fs');
     const { getProjectRoot } = require('../config');
-    const symbolsConfigPath = path.resolve(getProjectRoot(), `config/symbols/${this.currentExchange}.json`);
+    const symbolsConfigPath = path.resolve(getProjectRoot(), `src/config/symbols/${this.currentExchange}.json`);
     const symbolsConfig = JSON.parse(fs.readFileSync(symbolsConfigPath, 'utf8'));
     const allSymbols = new Set(symbolsConfig.symbols.map(s => s.symbol));
     this.nonMetalSymbols = new Set([...allSymbols].filter(s => !METAL_SYMBOLS.has(s) && !s.startsWith('XYZ')));
@@ -528,7 +528,7 @@ exchange: this.currentExchange,
       const allCandles = candleProvider.getAllClosedCandles();
       const symbolsConfigPath = require('path').resolve(
         require('../config').getProjectRoot(),
-        `config/symbols/${this.currentExchange}.json`
+        `src/config/symbols/${this.currentExchange}.json`
       );
       const symbolsConfig = JSON.parse(require('fs').readFileSync(symbolsConfigPath, 'utf8'));
       const intervals = symbolsConfig.intervals;

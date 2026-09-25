@@ -10,8 +10,8 @@ const VALID_DIRECTIONS = ['cross_above', 'cross_below'];
 
 function loadSymbols(exchange = 'bybit') {
   const candidates = [
-    path.resolve(__dirname, `../../../config/symbols/${exchange}.json`),
-    path.resolve(__dirname, `../../../../config/symbols/${exchange}.json`),
+    path.resolve(__dirname, `../../../src/config/symbols/${exchange}.json`),
+    path.resolve(__dirname, `../../../../src/config/symbols/${exchange}.json`),
   ];
   for (const p of candidates) {
     try {

@@ -414,7 +414,7 @@ class CandleProvider {
 
 if (require.main === module) {
   const exchange = process.env.EXCHANGE || 'hyperliquid';
-  const symbolsConfigPath = path.resolve(__dirname, `../../config/symbols/${exchange}.json`);
+  const symbolsConfigPath = path.resolve(__dirname, `../../src/config/symbols/${exchange}.json`);
   const symbolsConfig = JSON.parse(fs.readFileSync(symbolsConfigPath, 'utf8'));
   const symbols = symbolsConfig.symbols.map(s => s.symbol);
   const provider = new CandleProvider({
