@@ -32,7 +32,7 @@ class ScreenerCandleProvider {
 
   loadSymbols() {
     const exchange = process.env.EXCHANGE || 'hyperliquid';
-    const configPath = path.resolve(Config.getProjectRoot(), `config/symbols/${exchange}.json`);
+    const configPath = path.resolve(Config.getProjectRoot(), `src/config/symbols/${exchange}.json`);
     const raw = fs.readFileSync(configPath, 'utf8');
     const config = JSON.parse(raw);
     return config.symbols.map(s => s.symbol);
@@ -40,7 +40,7 @@ class ScreenerCandleProvider {
 
   loadTimeframes() {
     const exchange = process.env.EXCHANGE || 'hyperliquid';
-    const configPath = path.resolve(Config.getProjectRoot(), `config/symbols/${exchange}.json`);
+    const configPath = path.resolve(Config.getProjectRoot(), `src/config/symbols/${exchange}.json`);
     const raw = fs.readFileSync(configPath, 'utf8');
     const config = JSON.parse(raw);
     return config.intervals;
