@@ -85,17 +85,6 @@ class ServicesLauncher {
       });
     }, 2000);
     
-    this.screenerProcess.on('error', (error) => {
-      logger.error('ScreenerCandleProvider process error:', error);
-    });
-    
-    this.screenerProcess.on('exit', (code, signal) => {
-      if (!this.isShuttingDown) {
-        logger.error(`ScreenerCandleProvider process exited with code ${code}, signal ${signal}`);
-        this.shutdown('screener_exited');
-      }
-    });
-    
     logger.info('✅ OmniTrader Services started');
     logger.info('📅 TradingEngine: Scheduled mode');
     logger.info('📊 ScreenerCandleProvider: Real-time screener alerts');
