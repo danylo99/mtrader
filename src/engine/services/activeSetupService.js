@@ -127,7 +127,13 @@ static async checkBreakEven(ctx, setup, exchangeService) {
         if (!tp1Order || tp1Order.status !== 'filled') return;
       }
 
-      await exchangeService.cancelOrder(slOrder.exchange_order_id, setup.symbol, { 'trigger': true });
+      let cancelSucceeded = false;
+      try {
+        await exchangeService.cancelOrder(slOrder.exchange_order_id, setup.symbol, { 'trigger': true });
+        cancelSucceeded = true;
+      } catch (error) {
+        logger.warn(`BE cancel failed for setup #${setup.id} order ${slOrder.exchange_order_id}, proceeding: ${error.message}`);
+      }
 
       const newSlOrder = await exchangeService.placeOrder({
         symbol: setup.symbol,
@@ -140,7 +146,9 @@ static async checkBreakEven(ctx, setup, exchangeService) {
         reduceOnly: true
       });
 
-      await ctx.db.updateOrderStatus(slOrder.id, 'canceled');
+      if (cancelSucceeded) {
+        await ctx.db.updateOrderStatus(slOrder.id, 'canceled');
+      }
       await ctx.db.createOrder({
         setup_id: setup.id,
         order_type: 'sl',

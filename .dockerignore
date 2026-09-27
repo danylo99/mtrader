@@ -1,0 +1,10 @@
+node_modules
+**/node_modules
+.git
+.gitignore
+.next
+logs
+db
+*.md
+.env
+.env.*
