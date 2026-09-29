@@ -76,6 +76,36 @@ function SetupCardRaw({ setup, onCancel, onDelete }: {
         )}
       </div>
 
+      {(setup.status === 'pending' || setup.status === 'triggered' || setup.status === 'active') && (
+        <div className="mt-3 pt-3 border-t border-slate-700/50 grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 text-sm">
+          <div>
+            <p className="text-xs text-slate-500">Stop Loss</p>
+            <p className="font-mono text-white text-xs sm:text-sm">
+              {setup.sl_price > 0 ? setup.sl_price : 'Auto'}
+            </p>
+          </div>
+
+          {setup.be_enabled && (
+            <>
+              <div>
+                <p className="text-xs text-slate-500">BE Price</p>
+                <p className="font-mono text-white text-xs sm:text-sm">{setup.be_trigger_price}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 mb-1">BE Activated</p>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                  setup.be_activated
+                    ? 'text-green-400 bg-green-900/20'
+                    : 'text-amber-400 bg-amber-900/20'
+                }`}>
+                  {setup.be_activated ? 'Active' : 'Pending'}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
           <span>{setup.entry_indicator_type} ({setup.entry_indicator_tf})</span>
