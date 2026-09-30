@@ -6,17 +6,18 @@ const Candlestick = require('./indicators/candlestick');
 const EWT = require('./indicators/ewt');
 const MAZScore = require('./indicators/mazscore');
 const Helpers = require('./indicators/helpers');
+const PriceLevel = require('./indicators/priceLevel');
 
 class IndicatorService {
   static checkCondition(indicatorType, candles, params = {}) {
     try {
-      const validation = CandleUtils.validateCandles(candles, 20);
+      const normalizedType = this._normalizeType(indicatorType);
+      const minCandles = normalizedType === 'pricelevel' ? 1 : 20;
+      const validation = CandleUtils.validateCandles(candles, minCandles);
       if (!validation.valid) {
         logger.error(`Invalid candles for indicator check: ${validation.error}`);
         return { met: false, error: validation.error };
       }
-
-      const normalizedType = this._normalizeType(indicatorType);
 
       switch (normalizedType) {
         case 'supertrend':
@@ -35,6 +36,8 @@ class IndicatorService {
           return Candlestick.checkCandlestickPattern(candles, params.patternType);
         case 'mazscore':
           return MAZScore.checkMAZScore(candles, params);
+        case 'pricelevel':
+          return PriceLevel.checkPriceLevel(candles, params);
         default:
           return { met: false, error: `Unsupported indicator type: ${indicatorType}` };
       }
@@ -67,6 +70,8 @@ class IndicatorService {
           return MacdEma.getMACDSwingPrice(candles, side, params);
         case 'ema':
           return MacdEma.getEMASwingPrice(candles, side, params);
+        case 'pricelevel':
+          return { price: null };
         default:
           return { price: null, error: `Unsupported indicator type for swing detection: ${indicatorType}` };
       }
@@ -102,6 +107,7 @@ class IndicatorService {
         tradeMode: 'First Change Only',
       },
       'mazscore': { emaLength: 50, atrLength: 14, lookbackLength: 200 },
+      'pricelevel': { priceLevel: 0 },
     };
 
     return defaultParams[this._normalizeType(indicatorType)] || {};
@@ -120,7 +126,7 @@ class IndicatorService {
   }
 
   static validateIndicatorConfig(indicatorType, timeframe) {
-    const validIndicators = ['supertrend', 'rollingsupertrend', 'rollingsupertrend2', 'macd', 'ema', 'ewt', 'mazscore'];
+    const validIndicators = ['supertrend', 'rollingsupertrend', 'rollingsupertrend2', 'macd', 'ema', 'ewt', 'mazscore', 'pricelevel'];
     const validTimeframes = ['m1', 'm5', 'm15', 'm30', 'h1', 'h2', 'h4', 'd1', 'w1'];
 
     if (!validIndicators.includes(this._normalizeType(indicatorType))) {

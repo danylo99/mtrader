@@ -43,10 +43,16 @@ class ActiveSetupService {
       const currentPrice = closedBars[closedBars.length - 1].close;
       logger.info(`Checking exit condition for setup #${setup.id} at price ${currentPrice}`);
 
+      const exitParams = IndicatorService.getIndicatorParameters(setup.exit_indicator_type);
+      
+      if (setup.exit_indicator_type === 'pricelevel') {
+        exitParams.priceLevel = setup.exit_pricelevel_value;
+      }
+
       const exitResult = IndicatorService.checkCondition(
         setup.exit_indicator_type,
         closedBars,
-        IndicatorService.getIndicatorParameters(setup.exit_indicator_type)
+        exitParams
       );
 
       if (exitResult.met) {

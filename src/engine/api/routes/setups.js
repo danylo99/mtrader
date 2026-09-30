@@ -56,9 +56,12 @@ router.post('/', auth, async (req, res) => {
 
     const sql = `INSERT INTO trading_setups (
       user_id, exchange_account_id, symbol, side, memo, activation_price, ignore_box_upper, ignore_box_lower,
-      entry_indicator_type, entry_indicator_tf, risk_type, risk_value, sl_price, tp_prices,
-      be_enabled, be_trigger_price, exit_indicator_type, exit_indicator_tf, status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`;
+      entry_indicator_type, entry_indicator_tf, entry_pricelevel_value,
+      risk_type, risk_value, sl_price, tp_prices,
+      be_enabled, be_trigger_price,
+      exit_indicator_type, exit_indicator_tf, exit_pricelevel_value,
+      status, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`;
 
     const params = [
       userId,
@@ -71,6 +74,7 @@ router.post('/', auth, async (req, res) => {
       payload.ignore_box_lower || 0,
       normalizeIndicatorType(payload.entry_indicator_type) || null,
       payload.entry_indicator_tf || null,
+      payload.entry_pricelevel_value || 0,
       payload.risk_type || null,
       payload.risk_value || 0,
       payload.sl_price || 0,
@@ -79,6 +83,7 @@ router.post('/', auth, async (req, res) => {
       payload.be_trigger_price || 0,
       normalizeIndicatorType(payload.exit_indicator_type) || null,
       payload.exit_indicator_tf || null,
+      payload.exit_pricelevel_value || 0,
       payload.status || 'pending'
     ];
 
@@ -115,7 +120,7 @@ router.put('/:id', auth, async (req, res) => {
     const updates = [];
     const params = [];
     Object.entries(req.body || {}).forEach(([k, v]) => {
-      if (['exchange_account_id','symbol','side','memo','activation_price','ignore_box_upper','ignore_box_lower','entry_indicator_type','entry_indicator_tf','risk_type','risk_value','sl_price','tp_prices','be_enabled','be_trigger_price','exit_indicator_type','exit_indicator_tf','status'].includes(k)) {
+      if (['exchange_account_id','symbol','side','memo','activation_price','ignore_box_upper','ignore_box_lower','entry_indicator_type','entry_indicator_tf','entry_pricelevel_value','risk_type','risk_value','sl_price','tp_prices','be_enabled','be_trigger_price','exit_indicator_type','exit_indicator_tf','exit_pricelevel_value','status'].includes(k)) {
         updates.push(`${k} = ?`);
         params.push(k === 'tp_prices' ? JSON.stringify(v) : (k === 'entry_indicator_type' || k === 'exit_indicator_type') ? normalizeIndicatorType(v) : v);
       }

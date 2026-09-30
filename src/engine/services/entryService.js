@@ -45,10 +45,16 @@ class EntryService {
       return;
     }
     
+    const indicatorParams = IndicatorService.getIndicatorParameters(setup.entry_indicator_type);
+    
+    if (setup.entry_indicator_type === 'pricelevel') {
+      indicatorParams.priceLevel = setup.entry_pricelevel_value;
+    }
+    
     const indicatorResult = IndicatorService.checkCondition(
       setup.entry_indicator_type,
       closedBars,
-      IndicatorService.getIndicatorParameters(setup.entry_indicator_type)
+      indicatorParams
     );
     
     if (indicatorResult.met) {

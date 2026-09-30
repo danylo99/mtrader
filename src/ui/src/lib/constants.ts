@@ -17,6 +17,7 @@ export const INDICATORS = [
   { value: 'macd', label: 'MACD' },
   { value: 'ema', label: 'EMA Cross' },
   { value: 'ewt', label: 'EW Trading' },
+  { value: 'pricelevel', label: 'Price Level' },
 ] as const;
 
 export const DEFAULT_TP_RATIOS = [1, 2, 3, 4];

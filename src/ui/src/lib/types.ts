@@ -1,6 +1,6 @@
 export type Side = 'long' | 'short';
 export type SetupStatus = 'pending' | 'triggered' | 'active' | 'closed' | 'cancelled';
-export type EntryIndicatorType = 'supertrend' | 'rollingsupertrend' | 'rollingsupertrend2' | 'macd' | 'ema' | 'ewt' | 'manual';
+export type EntryIndicatorType = 'supertrend' | 'rollingsupertrend' | 'rollingsupertrend2' | 'macd' | 'ema' | 'ewt' | 'manual' | 'pricelevel';
 export type ScreenerIndicatorType = 'supertrend' | 'rollingsupertrend' | 'rollingsupertrend2' | 'macd' | 'ema' | 'ewt';
 export type Timeframe = 'm1' | 'm5' | 'm15' | 'm30' | 'h1' | 'h2' | 'h4' | 'd1' | 'w1';
 export type RiskType = 'percent' | 'fixed';
@@ -42,19 +42,21 @@ export interface TradingSetup {
   ignore_box_lower: number;
   entry_indicator_type: EntryIndicatorType;
   entry_indicator_tf: Timeframe;
+  entry_pricelevel_value: number;
   risk_type: RiskType;
   risk_value: number;
   sl_price: number;
   tp_prices: string;
   be_enabled: number;
   be_trigger_price: number;
-  be_activated: number;  // NEW FIELD
+  be_activated: number;
   entry_price: number | null;
   entry_qty: number | null;
   profit: number;
   activated_at: string | null;
   exit_indicator_type: EntryIndicatorType | null;
   exit_indicator_tf: Timeframe | null;
+  exit_pricelevel_value: number;
   closed_at: string | null;
   created_at: string;
   updated_at: string;
@@ -83,6 +85,7 @@ export interface SetupFormData {
   ignore_box_lower: number;
   entry_indicator_type: EntryIndicatorType;
   entry_indicator_tf: Timeframe;
+  entry_pricelevel_value: number;
   risk_type: RiskType;
   risk_value: number;
   sl_price: number;
@@ -91,6 +94,7 @@ export interface SetupFormData {
   be_trigger_price?: number;
   exit_indicator_type?: EntryIndicatorType;
   exit_indicator_tf?: Timeframe;
+  exit_pricelevel_value: number;
 }
 
 export interface ApiResponse<T = any> {

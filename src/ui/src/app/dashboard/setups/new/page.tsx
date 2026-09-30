@@ -29,6 +29,7 @@ export default function SetupFormPage() {
     ignore_box_lower: 0,
     entry_indicator_type: 'supertrend',
     entry_indicator_tf: 'h1',
+    entry_pricelevel_value: 0,
     risk_type: 'fixed',
     risk_value: 0,
     sl_price: 0,
@@ -37,6 +38,7 @@ export default function SetupFormPage() {
     be_trigger_price: 0,
     exit_indicator_type: undefined,
     exit_indicator_tf: undefined,
+    exit_pricelevel_value: 0,
   });
 
   async function fetchAccounts() {
@@ -342,6 +344,19 @@ type="number"
               </select>
             </div>
           </div>
+          {formData.entry_indicator_type === 'pricelevel' && (
+            <div className="mt-4">
+              <label className="mb-1 block text-sm text-slate-400">Price Level</label>
+              <input
+                type="number"
+                step="any"
+                value={numVal('entry_pricelevel_value')}
+                onChange={(e) => handleNum('entry_pricelevel_value', e.target.value)}
+                className="w-full sm:max-w-xs rounded-lg border border-slate-600 bg-slate-700/50 px-4 py-2.5 text-white outline-none focus:border-blue-500"
+                required
+              />
+            </div>
+          )}
         </div>
 
         {/* Section 4: Risk Management */}
@@ -543,6 +558,19 @@ type="number"
               </select>
             </div>
           </div>
+          {formData.exit_indicator_type === 'pricelevel' && (
+            <div className="mt-4">
+              <label className="mb-1 block text-sm text-slate-400">Price Level</label>
+              <input
+                type="number"
+                step="any"
+                value={numVal('exit_pricelevel_value')}
+                onChange={(e) => handleNum('exit_pricelevel_value', e.target.value)}
+                className="w-full sm:max-w-xs rounded-lg border border-slate-600 bg-slate-700/50 px-4 py-2.5 text-white outline-none focus:border-blue-500"
+                required
+              />
+            </div>
+          )}
         </div>
 
         {error && (

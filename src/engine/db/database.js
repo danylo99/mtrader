@@ -141,6 +141,8 @@ class Database {
       await this.runSupertrendSubscriptionsMigration();
       // Run BE activated migration
       await this.runBeActivatedMigration();
+      // Run price level config migration
+      await this.runPriceLevelConfigMigration();
     }
 
   }
@@ -207,13 +209,22 @@ class Database {
     }
   }
 
-  async runBeActivatedMigration() {
+async runBeActivatedMigration() {
     try {
       const Migration = require('./migrate_be_activated');
       const migration = new Migration(this);
       await migration.runMigration();
     } catch (error) {
       logger.error('BE activated migration failed:', error);
+    }
+  }
+
+  async runPriceLevelConfigMigration() {
+    try {
+      const Migration = require('./migrate_pricelevel_config');
+      await Migration.migrate(this);
+    } catch (error) {
+      logger.error('Price level config migration failed:', error);
     }
   }
 
@@ -701,7 +712,7 @@ async getExchangeAccountByIndex(index) {
     return this.all(sql);
   }
 
-  async replaceSupertrendAssetSubscriptionsForUser(userId, symbols) {
+async replaceSupertrendAssetSubscriptionsForUser(userId, symbols) {
     await this.run('DELETE FROM supertrend_asset_subscriptions WHERE user_id = ?', [userId]);
     for (const sym of symbols) {
       await this.run(

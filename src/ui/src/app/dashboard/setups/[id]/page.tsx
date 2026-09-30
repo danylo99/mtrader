@@ -146,6 +146,12 @@ export default function SetupDetailPage({ params }: { params: Promise<{ id: stri
               <dt className="text-sm text-slate-500">Indicator</dt>
               <dd className="text-sm text-white">{formatIndicator(setup.entry_indicator_type)} ({formatTf(setup.entry_indicator_tf)})</dd>
             </div>
+            {setup.entry_indicator_type === 'pricelevel' && setup.entry_pricelevel_value !== undefined && (
+              <div className="flex justify-between">
+                <dt className="text-sm text-slate-500">Price Level</dt>
+                <dd className="text-sm font-mono text-white">{setup.entry_pricelevel_value}</dd>
+              </div>
+            )}
           </dl>
         </div>
 
@@ -179,6 +185,12 @@ export default function SetupDetailPage({ params }: { params: Promise<{ id: stri
                 <dt className="text-sm text-slate-500">Indicator</dt>
                 <dd className="text-sm text-white">{formatIndicator(setup.exit_indicator_type)} ({formatTf(setup.exit_indicator_tf || '')})</dd>
               </div>
+              {setup.exit_indicator_type === 'pricelevel' && setup.exit_pricelevel_value !== undefined && (
+                <div className="flex justify-between">
+                  <dt className="text-sm text-slate-500">Price Level</dt>
+                  <dd className="text-sm font-mono text-white">{setup.exit_pricelevel_value}</dd>
+                </div>
+              )}
             </dl>
           </div>
         )}
