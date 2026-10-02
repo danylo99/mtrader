@@ -62,6 +62,14 @@ export interface TradingSetup {
   updated_at: string;
 }
 
+export interface SetupListSummary {
+  totalFixedRisk: number;
+  totalFloatingPnl: number;
+  fixedCount: number;
+  percentCount: number;
+  totalCount: number;
+}
+
 export interface Order {
   id: number;
   setup_id: number;
@@ -97,7 +105,7 @@ export interface SetupFormData {
   exit_pricelevel_value: number;
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;

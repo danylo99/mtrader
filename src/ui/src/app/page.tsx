@@ -28,8 +28,8 @@ export default function LoginPage() {
         if (typeof window !== 'undefined') sessionStorage.setItem('token', data.data.token);
         router.push('/dashboard');
       }
-    } catch (err: any) {
-      setError(err?.message || 'Connection error');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Connection error');
     } finally {
       setLoading(false);
     }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Plus, Key, Pencil, Trash2, Check, X, Send, Save, Shield } from 'lucide-react';
-import type { ExchangeAccount, User } from '@/lib/types';
+import type { ExchangeAccount } from '@/lib/types';
 import engineFetch from '@/lib/api';
 
 interface AccountFormData {
@@ -46,25 +46,22 @@ export default function SettingsPage() {
     try {
       const data = await engineFetch('/api/accounts');
       if (data.success) setAccounts(data.data);
-    } catch (err) {
+    } catch {
       // ignore
     }
     setLoading(false);
   }
 
-  async function fetchTelegramChatId() {
-    if (telegramChatId) return;
-    try {
-      const data = await engineFetch('/api/auth/me');
-      if (data.success && data.data?.telegram_chat_id) {
-        setTelegramChatId(data.data.telegram_chat_id);
-      }
-    } catch {}
-  }
-
   useEffect(() => {
-    fetchAccounts();
-    fetchTelegramChatId();
+    void (async () => {
+      await fetchAccounts();
+      try {
+        const data = await engineFetch('/api/auth/me');
+        if (data.success && data.data?.telegram_chat_id) {
+          setTelegramChatId(data.data.telegram_chat_id);
+        }
+      } catch {}
+    })();
   }, []);
 
   function clearMessages() {
@@ -300,7 +297,7 @@ export default function SettingsPage() {
             <div className="flex flex-col items-center justify-center py-16 text-slate-500">
               <Key className="mb-2 h-10 w-10" />
               <p>No accounts linked</p>
-              <p className="text-sm">Click "Link Account" to add an exchange account</p>
+              <p className="text-sm">Click &quot;Link Account&quot; to add an exchange account</p>
             </div>
           ) : (
             <div className="space-y-4">

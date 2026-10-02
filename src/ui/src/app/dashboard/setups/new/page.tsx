@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, Trash2, Info } from 'lucide-react';
 import engineFetch from '@/lib/api';
 import { TIMEFRAMES, INDICATORS, DEFAULT_TP_RATIOS } from '@/lib/constants';
@@ -10,12 +10,9 @@ import SymbolPicker from '@/components/SymbolPicker';
 
 export default function SetupFormPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const mode = searchParams.get('mode');
 
   const [accounts, setAccounts] = useState<ExchangeAccount[]>([]);
   const [showNoAccountModal, setShowNoAccountModal] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -41,26 +38,26 @@ export default function SetupFormPage() {
     exit_pricelevel_value: 0,
   });
 
-  async function fetchAccounts() {
-    setLoading(true);
-    try {
-      const data = await engineFetch('/api/accounts');
-      if (data.success) {
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const data = await engineFetch('/api/accounts');
+        if (!active || !data.success) return;
         setAccounts(data.data);
         if (!data.data || data.data.length === 0) {
           setShowNoAccountModal(true);
+          return;
         }
-        if (data.data.length > 0 && formData.exchange_account_id === 0) {
-          updateField('exchange_account_id', data.data[0].id);
-        }
+        setFormData((prev) => (
+          prev.exchange_account_id === 0 ? { ...prev, exchange_account_id: data.data[0].id } : prev
+        ));
+      } catch {
+        // fetch failed — accounts will remain empty
       }
-    } catch {
-      // fetch failed — accounts will remain empty
-    }
-    setLoading(false);
-  }
-
-  useEffect(() => { fetchAccounts(); }, []);
+    })();
+    return () => { active = false; };
+  }, []);
 
   const [rawNums, setRawNums] = useState<Record<string, string>>({});
   const [rawTp, setRawTp] = useState<Record<number, string>>({});
@@ -72,19 +69,31 @@ export default function SetupFormPage() {
     setFormData((prev) => ({ ...prev, [key]: value }));
   }
 
-  function handleNum(key: keyof SetupFormData, raw: string) {
+  type NumericFormKey =
+  | 'exchange_account_id'
+  | 'activation_price'
+  | 'ignore_box_upper'
+  | 'ignore_box_lower'
+  | 'entry_pricelevel_value'
+  | 'risk_value'
+  | 'sl_price'
+  | 'be_trigger_price'
+  | 'exit_pricelevel_value';
+
+  function handleNum(key: NumericFormKey, raw: string) {
     setRawNums((prev) => ({ ...prev, [key]: raw }));
     if (raw === '' || raw === '-' || raw === '.') return;
     const num = parseFloat(raw);
-    if (!isNaN(num)) updateField(key as any, num);
+    if (!isNaN(num)) updateField(key, num);
   }
 
-  function numVal(key: keyof SetupFormData): string | number {
-    return rawNums[key] !== undefined ? rawNums[key] : (formData as any)[key];
+  function numVal(key: NumericFormKey): string | number {
+    if (rawNums[key] !== undefined) return rawNums[key];
+    return formData[key] ?? 0;
   }
 
-  function showZeroWarning(key: keyof SetupFormData): React.ReactNode {
-    if (rawNums[key] !== undefined && (formData as any)[key] === 0) {
+  function showZeroWarning(key: NumericFormKey): React.ReactNode {
+    if (rawNums[key] !== undefined && formData[key] === 0) {
       const hints: Record<string, string> = {
         activation_price: 'Set to 0 for auto-detection',
         ignore_box_upper: 'Set to 0 to disable',

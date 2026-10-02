@@ -71,9 +71,9 @@ export default function EWScreenerPage() {
   }, []);
 
   useEffect(() => {
-    fetchData();
-    fetchSubs();
-    fetchMe();
+    void (async () => {
+      await Promise.all([fetchData(), fetchSubs(), fetchMe()]);
+    })();
     const interval = setInterval(fetchData, 120000);
     return () => clearInterval(interval);
   }, [fetchData, fetchSubs, fetchMe]);

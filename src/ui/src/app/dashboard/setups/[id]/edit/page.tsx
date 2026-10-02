@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Trash2, Info, Lock } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Info } from 'lucide-react';
 import engineFetch from '@/lib/api';
 import { TIMEFRAMES, INDICATORS, DEFAULT_TP_RATIOS } from '@/lib/constants';
 import type { ExchangeAccount, TradingSetup, SetupFormData, Side, EntryIndicatorType, Timeframe, RiskType } from '@/lib/types';
@@ -52,7 +52,6 @@ export default function EditSetupPage({ params }: { params: Promise<{ id: string
   });
 
   const [rawNums, setRawNums] = useState<Record<string, string>>({});
-  const [rawTp, setRawTp] = useState<Record<number, string>>({});
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
   const [startRr, setStartRr] = useState('0.6');
   const [endRr, setEndRr] = useState('3');
@@ -107,24 +106,36 @@ export default function EditSetupPage({ params }: { params: Promise<{ id: string
     setFormData((prev) => ({ ...prev, [key]: value }));
   }
 
-  function handleNum(key: keyof SetupFormData, raw: string) {
+  type NumericFormKey =
+    | 'exchange_account_id'
+    | 'activation_price'
+    | 'ignore_box_upper'
+    | 'ignore_box_lower'
+    | 'entry_pricelevel_value'
+    | 'risk_value'
+    | 'sl_price'
+    | 'be_trigger_price'
+    | 'exit_pricelevel_value';
+
+  function handleNum(key: NumericFormKey, raw: string) {
     setRawNums((prev) => ({ ...prev, [key]: raw }));
-    markTouched(key as string);
+    markTouched(key);
     if (raw === '' || raw === '-' || raw === '.') return;
     const num = parseFloat(raw);
-    if (!isNaN(num)) updateField(key as any, num);
+    if (!isNaN(num)) updateField(key, num);
   }
 
-  function numVal(key: keyof SetupFormData): string | number {
-    return rawNums[key] !== undefined ? rawNums[key] : (formData as any)[key];
+  function numVal(key: NumericFormKey): string | number {
+    if (rawNums[key] !== undefined) return rawNums[key];
+    return formData[key] ?? 0;
   }
 
   function markTouched(key: string) {
     setTouchedFields((prev) => new Set(prev).add(key));
   }
 
-  function showZeroWarning(key: string): React.ReactNode {
-    if (touchedFields.has(key) && (formData as any)[key] === 0) {
+  function showZeroWarning(key: NumericFormKey): React.ReactNode {
+    if (touchedFields.has(key) && formData[key] === 0) {
       const hints: Record<string, string> = {
         activation_price: 'Set to 0 for auto-detection',
         ignore_box_upper: 'Set to 0 to disable',
@@ -152,17 +163,6 @@ export default function EditSetupPage({ params }: { params: Promise<{ id: string
     if (formData.tp_prices.length < 100) {
       updateField('tp_prices', [...formData.tp_prices, +(maxTp + 1).toFixed(1)]);
     }
-  }
-
-  function handleTpRaw(index: number, raw: string) {
-    setRawTp((prev) => ({ ...prev, [index]: raw }));
-    if (raw === '' || raw === '-' || raw === '.') return;
-    const num = parseFloat(raw);
-    if (!isNaN(num)) updateTpLevel(index, num);
-  }
-
-  function tpVal(index: number): string | number {
-    return rawTp[index] !== undefined ? rawTp[index] : formData.tp_prices[index];
   }
 
   function generateTpList() {
@@ -202,21 +202,7 @@ export default function EditSetupPage({ params }: { params: Promise<{ id: string
     }
   }
 
-  function InputWrapper({ children, disabled, reason }: { children: React.ReactNode; disabled: boolean; reason?: string }) {
-    return (
-      <div className={`relative ${disabled ? 'opacity-50' : ''}`}>
-        {children}
-        {disabled && reason && (
-          <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
-            <Lock className="h-3 w-3" />
-            {reason}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (loading) {
+if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />

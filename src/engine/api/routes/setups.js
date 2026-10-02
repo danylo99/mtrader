@@ -30,6 +30,23 @@ router.get('/', auth, async (req, res) => {
       rows = rows.filter(r => r.user_id === userId);
     }
 
+    // Totals over the full user-scoped status set, before the search filter,
+    // so search affects neither total.
+    // BE-activated setups are risk-free: SL already moved to entry price.
+    // be_activated is only ever set for active setups, so this is a no-op on
+    // the pending/triggered tabs.
+    const counted = rows.filter(r => r.risk_type === 'fixed' && !Number(r.be_activated));
+    const totalFixedRisk = counted.reduce((sum, r) => sum + (Number(r.risk_value) || 0), 0);
+    // Stored profit column; only meaningful on active setups (0 elsewhere).
+    const totalFloatingPnl = rows.reduce((sum, r) => sum + (Number(r.profit) || 0), 0);
+    const summary = {
+      totalFixedRisk: Math.round(totalFixedRisk * 100) / 100,
+      totalFloatingPnl: Math.round(totalFloatingPnl * 100) / 100,
+      fixedCount: counted.length,
+      percentCount: rows.filter(r => r.risk_type !== 'fixed').length,
+      totalCount: rows.length,
+    };
+
     // basic search
     if (search) {
       const q = String(search).toLowerCase();
@@ -42,7 +59,7 @@ router.get('/', auth, async (req, res) => {
     const start = (p - 1) * lim;
     const paged = rows.slice(start, start + lim);
 
-    res.json({ success: true, data: paged, total: rows.length });
+    res.json({ success: true, data: paged, total: rows.length, summary });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

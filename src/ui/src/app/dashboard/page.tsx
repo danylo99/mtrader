@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { PlusCircle, ExternalLink, XCircle, Trash2 } from 'lucide-react';
 import engineFetch from '@/lib/api';
 import { parseTpPrices } from '@/lib/constants';
-import type { TradingSetup } from '@/lib/types';
+import type { TradingSetup, SetupListSummary } from '@/lib/types';
 
 type TabType = 'pending' | 'triggered' | 'active' | 'closed';
 
@@ -153,42 +153,50 @@ export default function DashboardPage() {
   const [search, setSearch] = useState('');
   const [closedPage, setClosedPage] = useState(1);
   const [totalClosed, setTotalClosed] = useState(0);
+  const [summary, setSummary] = useState<SetupListSummary | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [searchDebounced, setSearchDebounced] = useState('');
   const PER_PAGE = 10;
 
-  async function fetchSetups() {
-    setLoading(true);
-    try {
-      const statusMap: Record<string, string> = { pending: 'pending', triggered: 'triggered', active: 'active', closed: 'closed,cancelled' };
-      const params = new URLSearchParams({ status: statusMap[tab] || tab, page: String(closedPage), limit: String(PER_PAGE) });
-      if (search) params.set('search', search);
-      const data = await engineFetch(`/api/setups?${params}`);
-      if (data.success) {
-        setSetups(data.data);
-        setTotalClosed(data.total || 0);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => { fetchSetups(); }, [tab, closedPage]);
-
   useEffect(() => {
-    const timer = setTimeout(fetchSetups, 300);
+    const timer = setTimeout(() => setSearchDebounced(search), 300);
     return () => clearTimeout(timer);
   }, [search]);
 
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      setLoading(true);
+      setSummary(null);
+      try {
+        const statusMap: Record<string, string> = { pending: 'pending', triggered: 'triggered', active: 'active', closed: 'closed,cancelled' };
+        const params = new URLSearchParams({ status: statusMap[tab] || tab, page: String(closedPage), limit: String(PER_PAGE) });
+        if (searchDebounced) params.set('search', searchDebounced);
+        const data = await engineFetch(`/api/setups?${params}`);
+        if (!active) return;
+        if (data.success) {
+          setSetups(data.data);
+          setTotalClosed(data.total || 0);
+          setSummary(data.summary ?? null);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [tab, closedPage, searchDebounced, reloadKey]);
+
   const handleCancel = useCallback(async (id: number) => {
     const data = await engineFetch(`/api/setups/${id}`, { method: 'DELETE' });
-    if (data.success) { fetchSetups(); }
+    if (data.success) setReloadKey((k) => k + 1);
   }, []);
 
   const handleDelete = useCallback(async (id: number) => {
     if (!confirm('Permanently delete this setup? This cannot be undone.')) return;
     const data = await engineFetch(`/api/setups/${id}?hard=true`, { method: 'DELETE' });
-    if (data.success) { fetchSetups(); }
+    if (data.success) setReloadKey((k) => k + 1);
   }, []);
 
   const totalPages = Math.ceil(totalClosed / PER_PAGE);
@@ -214,6 +222,36 @@ export default function DashboardPage() {
           </button>
         ))}
       </div>
+
+      {tab !== 'closed' && (
+        <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-slate-500">Total risk (fixed)</p>
+              <p className="font-mono text-lg sm:text-xl text-white">
+                {summary ? `$${summary.totalFixedRisk.toFixed(2)}` : '—'}
+              </p>
+              {summary && (
+                <p className="text-xs text-slate-500">
+                  {summary.fixedCount} fixed setup(s)
+                  {summary.percentCount > 0 && ` · ${summary.percentCount} percent-risk setup(s) not counted`}
+                </p>
+              )}
+            </div>
+            {tab === 'active' && (
+              <div>
+                <p className="text-xs text-slate-500">Floating PnL</p>
+                <p className={`font-mono text-lg sm:text-xl ${summary && summary.totalFloatingPnl < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  {summary
+                    ? `${summary.totalFloatingPnl >= 0 ? '+' : '-'}$${Math.abs(summary.totalFloatingPnl).toFixed(2)}`
+                    : '—'}
+                </p>
+                {summary && <p className="text-xs text-slate-500">{summary.totalCount} active position(s)</p>}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="mb-4">
         <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Bell, Plus, Trash2, Check, X, Pencil } from 'lucide-react';
 import engineFetch from '@/lib/api';
-import type { PriceAlarm, Timeframe, ExchangeAccount } from '@/lib/types';
+import type { PriceAlarm, Timeframe } from '@/lib/types';
 import SymbolPicker from '@/components/SymbolPicker';
 import { getSymbols } from '@/lib/symbols';
 
@@ -35,7 +35,6 @@ export default function PriceAlarmsPage() {
   const [editError, setEditError] = useState<string | null>(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
 
-  const [accounts, setAccounts] = useState<ExchangeAccount[]>([]);
   const [selectedExchange, setSelectedExchange] = useState<string>('bybit');
 
   const exchange = selectedExchange;
@@ -75,7 +74,6 @@ export default function PriceAlarmsPage() {
     try {
       const res = await engineFetch('/api/accounts');
       if (res.success && Array.isArray(res.data)) {
-        setAccounts(res.data);
         if (res.data.length > 0) {
           setSelectedExchange(res.data[0].exchange);
         }
@@ -84,10 +82,9 @@ export default function PriceAlarmsPage() {
   }, []);
 
   useEffect(() => {
-    fetchAlarms();
-    fetchSymbolDisplays();
-    fetchMe();
-    fetchAccounts();
+    void (async () => {
+      await Promise.all([fetchAlarms(), fetchSymbolDisplays(), fetchMe(), fetchAccounts()]);
+    })();
   }, [fetchAlarms, fetchSymbolDisplays, fetchMe, fetchAccounts]);
 
   function resetForm() {

@@ -121,8 +121,9 @@ export default function MAZScoreScreenerPage() {
   }, []);
 
   useEffect(() => {
-    fetchData();
-    fetchSubs();
+    void (async () => {
+      await Promise.all([fetchData(), fetchSubs()]);
+    })();
     const interval = setInterval(fetchData, 120000);
     return () => clearInterval(interval);
   }, [fetchData, fetchSubs]);

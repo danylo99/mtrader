@@ -13,7 +13,6 @@ export default function ManualOrderFormPage() {
 
   const [accounts, setAccounts] = useState<ExchangeAccount[]>([]);
   const [showNoAccountModal, setShowNoAccountModal] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -34,24 +33,24 @@ export default function ManualOrderFormPage() {
 
   const [slTouched, setSlTouched] = useState(false);
 
-  async function fetchAccounts() {
-    setLoading(true);
-    try {
-      const data = await engineFetch('/api/accounts');
-      if (data.success) {
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const data = await engineFetch('/api/accounts');
+        if (!active || !data.success) return;
         setAccounts(data.data);
         if (!data.data || data.data.length === 0) {
           setShowNoAccountModal(true);
+          return;
         }
-        if (data.data.length > 0 && formData.exchange_account_id === 0) {
-          updateField('exchange_account_id', data.data[0].id);
-        }
-      }
-    } catch {}
-    setLoading(false);
-  }
-
-  useEffect(() => { fetchAccounts(); }, []);
+        setFormData((prev) => (
+          prev.exchange_account_id === 0 ? { ...prev, exchange_account_id: data.data[0].id } : prev
+        ));
+      } catch {}
+    })();
+    return () => { active = false; };
+  }, []);
 
   const [rawNums, setRawNums] = useState<Record<string, string>>({});
   const [rawTp, setRawTp] = useState<Record<number, string>>({});
@@ -63,19 +62,21 @@ export default function ManualOrderFormPage() {
     setFormData((prev) => ({ ...prev, [key]: value }));
   }
 
-  function handleNum(key: keyof typeof formData, raw: string) {
+  type NumericFormKey = 'exchange_account_id' | 'risk_value' | 'sl_price' | 'be_trigger_price';
+
+  function handleNum(key: NumericFormKey, raw: string) {
     setRawNums((prev) => ({ ...prev, [key]: raw }));
     if (raw === '' || raw === '-' || raw === '.') return;
     const num = parseFloat(raw);
-    if (!isNaN(num)) updateField(key as any, num);
+    if (!isNaN(num)) updateField(key, num);
   }
 
-  function numVal(key: keyof typeof formData): string | number {
-    return rawNums[key] !== undefined ? rawNums[key] : (formData as any)[key];
+  function numVal(key: NumericFormKey): string | number {
+    return rawNums[key] !== undefined ? rawNums[key] : formData[key];
   }
 
-  function showZeroWarning(key: keyof typeof formData): React.ReactNode {
-    if (rawNums[key] !== undefined && (formData as any)[key] === 0) {
+  function showZeroWarning(key: NumericFormKey): React.ReactNode {
+    if (rawNums[key] !== undefined && formData[key] === 0) {
       const hints: Record<string, string> = {
         be_trigger_price: 'Price will trigger immediately if BE is enabled',
       };
