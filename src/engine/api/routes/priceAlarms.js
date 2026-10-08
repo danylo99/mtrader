@@ -24,9 +24,6 @@ function loadAssets() {
 function loadSymbols(exchange = 'bybit') {
   const config = loadAssets();
   const symbols = config.assets || [];
-  if (exchange === 'bybit') {
-    return { symbols: symbols.filter(a => a.provider === 'bybit').map(a => ({ symbol: a.symbol_ccxt, display: a.display })) };
-  }
   return { symbols: symbols.map(a => ({ symbol: a.symbol_ccxt, display: a.display })) };
 }
 

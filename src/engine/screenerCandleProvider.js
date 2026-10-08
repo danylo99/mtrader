@@ -112,12 +112,12 @@ class ScreenerCandleProvider {
       logger.info(`Monitoring ALL ${assets.length} assets from config`);
       logger.info(`Timeframes: ${timeframes.join(', ')}`);
 
+      this.startCandleApiServer();
+
       await this.candleProvider.waitForHistorical();
 
       await AllAssetsScreenerService.populateInitialSnapshot(this.candleProvider);
       await AllAssetsScreenerService.populateMAZScoreSnapshot(this.candleProvider);
-
-      this.startCandleApiServer();
 
     } catch (error) {
       logger.error('Failed to start Screener CandleProvider:', error);

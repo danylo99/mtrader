@@ -388,6 +388,23 @@ async runBeActivatedMigration() {
     return { ...orderData, id: result.lastID };
   }
 
+  async getOrderById(orderId) {
+    return this.get('SELECT * FROM orders WHERE id = ?', [orderId]);
+  }
+
+  async updateOrder(orderId, data) {
+    const updates = [];
+    const params = [];
+    if (data.price !== undefined) { updates.push('price = ?'); params.push(data.price); }
+    if (data.qty !== undefined) { updates.push('qty = ?'); params.push(data.qty); }
+    if (data.exchange_order_id !== undefined) { updates.push('exchange_order_id = ?'); params.push(data.exchange_order_id); }
+    if (data.status !== undefined) { updates.push('status = ?'); params.push(data.status); }
+    if (updates.length === 0) return;
+    updates.push('updated_at = datetime("now")');
+    params.push(orderId);
+    return this.run(`UPDATE orders SET ${updates.join(', ')} WHERE id = ?`, params);
+  }
+
   async updateOrderStatus(orderId, status, exchangeOrderId = null) {
     const updates = ['status = ?', 'updated_at = datetime("now")'];
     const params = [status];

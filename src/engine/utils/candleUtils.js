@@ -160,6 +160,51 @@ static timeframeToBybitInterval(timeframe) {
     return bodyRatio < threshold;
   }
 
+  static getIntervalMs(timeframe) {
+    const map = { m1: 60000, m5: 300000, m15: 900000, m30: 1800000, h1: 3600000, h2: 7200000, h4: 14400000, d1: 86400000, w1: 604800000 };
+    if (!map[timeframe]) throw new Error(`Unsupported timeframe: ${timeframe}`);
+    return map[timeframe];
+  }
+
+  static aggregateOHLCV(sourceCandles, sourceTf, targetTf) {
+    if (!Array.isArray(sourceCandles) || sourceCandles.length < 2) return [];
+    const targetMs = this.getIntervalMs(targetTf);
+    const buckets = new Map();
+
+    for (const c of sourceCandles) {
+      const ts = parseInt(c[0]);
+      const bucketStart = Math.floor(ts / targetMs) * targetMs;
+      if (!buckets.has(bucketStart)) buckets.set(bucketStart, []);
+      buckets.get(bucketStart).push(c);
+    }
+
+    const result = [];
+    const latestTs = parseInt(sourceCandles[sourceCandles.length - 1][0]);
+    const sortedBuckets = [...buckets.entries()].sort((a, b) => a[0] - b[0]);
+
+    for (const [bucketStart, bars] of sortedBuckets) {
+      if (latestTs < bucketStart + targetMs) continue;
+
+      let open = parseFloat(bars[0][1]);
+      let high = parseFloat(bars[0][2]);
+      let low = parseFloat(bars[0][3]);
+      let close = parseFloat(bars[bars.length - 1][4]);
+      let volume = 0;
+
+      for (const bar of bars) {
+        const h = parseFloat(bar[2]);
+        const l = parseFloat(bar[3]);
+        if (h > high) high = h;
+        if (l < low) low = l;
+        volume += parseFloat(bar[5] || 0);
+      }
+
+      result.push([bucketStart, open, high, low, close, volume]);
+    }
+
+    return result;
+  }
+
   static isEngulfingPattern(prevCandle, currentCandle) {
     // Bullish engulfing
     if (this.isBearishCandle(prevCandle) && this.isBullishCandle(currentCandle)) {

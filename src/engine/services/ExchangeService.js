@@ -35,20 +35,39 @@ class ExchangeService {
     }
     
     this.symbolInfoCache = new Map();
+    this.symbolMap = null;
+  }
+
+  _resolveSymbol(ccxtSymbol) {
+    if (this.exchangeName !== 'hyperliquid') return ccxtSymbol;
+    try {
+      if (!this.symbolMap) {
+        const path = require('path');
+        const fs = require('fs');
+        const { getProjectRoot } = require('../config');
+        const config = JSON.parse(fs.readFileSync(path.resolve(getProjectRoot(), 'src/config/symbols/assets.json'), 'utf8'));
+        this.symbolMap = {};
+        for (const a of config.assets) {
+          if (a.symbol_hyperliquid) this.symbolMap[a.symbol_ccxt] = a.symbol_hyperliquid;
+        }
+      }
+      return this.symbolMap[ccxtSymbol] || ccxtSymbol;
+    } catch (e) {
+      logger.error('Failed to resolve hyperliquid symbol:', e.message);
+      return ccxtSymbol;
+    }
   }
   
   // Get symbol info (cached)
 async getSymbolInfo(symbol) {
-    const normalizedSymbol = symbol;
-    const exchangeSymbol = symbol;
-
-    if (this.symbolInfoCache.has(normalizedSymbol)) {
-      return this.symbolInfoCache.get(normalizedSymbol);
+    const exchangeSymbol = this._resolveSymbol(symbol);
+    if (this.symbolInfoCache.has(exchangeSymbol)) {
+      return this.symbolInfoCache.get(exchangeSymbol);
     }
     
     try {
       const markets = await this.exchange.loadMarkets();
-      const market = markets[symbol];
+      const market = markets[exchangeSymbol];
       
       if (market) {
         const tickSize = market.precision?.price ?? market.info?.priceFilter?.tickSize ?? market.info?.tickSize;
@@ -64,11 +83,10 @@ async getSymbolInfo(symbol) {
           active: market.active,
           trading: market.info?.status === 'Trading',
         };
-        this.symbolInfoCache.set(normalizedSymbol, info);
+this.symbolInfoCache.set(exchangeSymbol, info);
         return info;
       }
-      
-      throw new Error(`No market info for ${symbol} (exchange: ${exchangeSymbol}, normalized: ${normalizedSymbol}) on ${this.exchangeName}`);
+      throw new Error(`No market info for ${exchangeSymbol} on ${this.exchangeName}`);
     } catch (error) {
       logger.apiError('getSymbolInfo', error);
       throw error;
@@ -78,7 +96,8 @@ async getSymbolInfo(symbol) {
   // Get candles/OHLCV data
   async getCandles(symbol, timeframe, limit = 100) {
     try {
-      const candles = await this.exchange.fetchOHLCV(symbol, this.timeframeToInterval(timeframe), undefined, limit);
+      const exchangeSymbol = this._resolveSymbol(symbol);
+      const candles = await this.exchange.fetchOHLCV(exchangeSymbol, this.timeframeToInterval(timeframe), undefined, limit);
       // Convert to format expected by existing code
       const formattedCandles = candles.map(candle => [
         candle[0].toString(), // timestamp
@@ -100,12 +119,13 @@ async getSymbolInfo(symbol) {
   // Get ticker data
   async getTicker(symbol) {
     try {
-      const ticker = await this.exchange.fetchTicker(symbol);
+      const ticker = await this.exchange.fetchTicker(this._resolveSymbol(symbol));
+      const last = ticker.last || ticker.close || ticker.vwap || ticker.lastPrice || 0;
       return {
         symbol: ticker.symbol,
-        lastPrice: ticker.last.toString(),
-        bidPrice: ticker.bid.toString(),
-        askPrice: ticker.ask.toString()
+        lastPrice: last.toString(),
+        bidPrice: (ticker.bid || last).toString(),
+        askPrice: (ticker.ask || last).toString()
       };
     } catch (error) {
       logger.apiError('getTicker', error);
@@ -140,15 +160,11 @@ async getSymbolInfo(symbol) {
   // Place an order
   async placeOrder(orderParams) {
     try {
-      const symbol = orderParams.symbol;
-      const exchangeSymbol = this.exchangeName === 'hyperliquid'
-        ? ExchangeService.formatHyperliquidSymbol(symbol)
-        : symbol.replace(':USDT', '').replace('/', '');
-      const normalizedSymbol = exchangeSymbol;
+      const symbol = this._resolveSymbol(orderParams.symbol);
 
       // Convert order parameters to CCXT format
       const params = {
-        symbol: exchangeSymbol,
+        symbol,
         type: orderParams.orderType.toLowerCase(),
         side: orderParams.side.toLowerCase(),
         amount: parseFloat(orderParams.qty)
@@ -199,7 +215,7 @@ async getSymbolInfo(symbol) {
         params
       );
       
-      logger.info(`Order placed on ${this.exchangeName}: ${order.id} for ${order.symbol} (${exchangeSymbol}`);
+      logger.info(`Order placed on ${this.exchangeName}: ${order.id} for ${order.symbol} (${symbol})`);
       
       return {
         orderId: order.id,
@@ -218,14 +234,14 @@ async getSymbolInfo(symbol) {
   
   // Get order status
   async getOrderStatus(orderId, symbol) {
-    
+    const exchangeSymbol = this._resolveSymbol(symbol);
     try {
       if(this.exchangeName=='bybit'){
-        const order = await this.exchange.fetchClosedOrder(orderId, symbol);
+        const order = await this.exchange.fetchClosedOrder(orderId, exchangeSymbol);
         return order;
 
       }else{
-        const order = await this.exchange.fetchOrder(orderId, symbol);
+        const order = await this.exchange.fetchOrder(orderId, exchangeSymbol);
         return order;
       }
     } catch (error) {
@@ -239,18 +255,19 @@ async getSymbolInfo(symbol) {
 }
 
   roundPrice(symbol, price) {
-    return parseFloat(this.exchange.priceToPrecision(symbol, price));
+    return parseFloat(this.exchange.priceToPrecision(this._resolveSymbol(symbol), price));
   }
 
   roundAmount(symbol, amount) {
-    return parseFloat(this.exchange.amountToPrecision(symbol, amount));
+    return parseFloat(this.exchange.amountToPrecision(this._resolveSymbol(symbol), amount));
   }
 
   // Cancel order
   async cancelOrder(orderId, symbol, params = {}) {
     try {
-      const result = await this.exchange.cancelOrder(orderId, symbol, params);
-      logger.info(`Order canceled on ${this.exchangeName}: ${orderId} for ${symbol}`);
+      const exchangeSymbol = this._resolveSymbol(symbol);
+      const result = await this.exchange.cancelOrder(orderId, exchangeSymbol, params);
+      logger.info(`Order canceled on ${this.exchangeName}: ${orderId} for ${exchangeSymbol}`);
       return true;
     } catch (error) {
       logger.apiError('cancelOrder', error);
@@ -264,7 +281,7 @@ async getSymbolInfo(symbol) {
       let positions;
       
       if (symbol) {
-        positions = await this.exchange.fetchPositions([symbol]);
+        positions = await this.exchange.fetchPositions([this._resolveSymbol(symbol)]);
       } else {
         positions = await this.exchange.fetchPositions();
       }
@@ -290,15 +307,16 @@ async getSymbolInfo(symbol) {
   // Close position (market order in opposite direction)
   async closePosition(symbol, side) {
     try {
+      const exchangeSymbol = this._resolveSymbol(symbol);
       // Get current position
-      const positions = await this.getPositions(symbol);
+      const positions = await this.getPositions(exchangeSymbol);
       const position = positions.find(p => {
         // Compare normalized symbols
-        return p.symbol === symbol && Math.abs(p.size) > 0;
+        return p.symbol === exchangeSymbol && Math.abs(p.size) > 0;
       });
       
       if (!position) {
-        throw new Error(`No open position found for ${symbol} (${symbol})`);
+        throw new Error(`No open position found for ${exchangeSymbol}`);
       }
       
       // Determine close side (opposite of current position)
@@ -307,7 +325,7 @@ async getSymbolInfo(symbol) {
       
       // Place market order to close
       const params = {
-        symbol: symbol,
+        symbol: exchangeSymbol,
         orderType: 'market',
         side: closeSide,
         qty: closeAmount.toString(),
@@ -316,7 +334,7 @@ async getSymbolInfo(symbol) {
       
       const result = await this.placeOrder(params);
       
-      logger.info(`Position closed on ${this.exchangeName}: ${symbol} at ${result.price}`);
+      logger.info(`Position closed on ${this.exchangeName}: ${exchangeSymbol} at ${result.price}`);
       return result;
     } catch (error) {
       logger.apiError('closePosition', error);

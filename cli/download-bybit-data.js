@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const BYBIT_BASE_URL = 'https://api.bybit.com';
-const SYMBOLS_CONFIG_PATH = path.join(__dirname, '..', 'src', 'config', 'symbols', 'bybit.json');
+const SYMBOLS_CONFIG_PATH = path.join(__dirname, '..', 'src', 'config', 'symbols', 'assets.json');
 const PRICES_DIR = path.join(__dirname, '..', 'prices');
 
 const INTERVAL_MAP = {
@@ -157,11 +157,13 @@ async function main() {
 
   const config = JSON.parse(fs.readFileSync(SYMBOLS_CONFIG_PATH, 'utf8'));
 
-  console.log(`Downloading ${config.symbols.length} symbols, interval=${options.interval}, years=${options.years}\n`);
+  const bybitAssets = config.assets.filter(a => a.provider === 'bybit');
 
-  for (const asset of config.symbols) {
+  console.log(`Downloading ${bybitAssets.length} symbols, interval=${options.interval}, years=${options.years}\n`);
+
+  for (const asset of bybitAssets) {
     try {
-      await downloadSymbol(asset.symbol, asset.display.replace("USDT.P","_"+options.interval), options.interval, options.years);
+      await downloadSymbol(asset.symbol_ccxt, asset.display.replace("USDT.P","_"+options.interval), options.interval, options.years);
       await delay(1000);
     } catch (err) {
       console.error(`  FAILED [${asset.display}]: ${err.message}`);

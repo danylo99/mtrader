@@ -5,8 +5,7 @@ import { Activity, RefreshCw } from 'lucide-react';
 import SymbolPicker from '@/components/SymbolPicker';
 import { getAssets } from '@/lib/symbols';
 import type { Asset } from '@/lib/symbols';
-
-const CANDLE_API_URL = process.env.NEXT_PUBLIC_CANDLE_API_URL || 'http://localhost:3004';
+import engineFetch from '@/lib/api';
 
 const TIMEFRAMES = ['m1', 'm5', 'm15', 'h1', 'h4', 'd1'];
 
@@ -35,11 +34,10 @@ export default function ChatPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${CANDLE_API_URL}/quote/${encodeURIComponent(selectedSymbol)}?timeframe=${selectedTimeframe}`);
-      const data = await res.json();
+      const data = await engineFetch(`/api/candles/quote/${encodeURIComponent(selectedSymbol)}?timeframe=${selectedTimeframe}`);
       setPrice(data);
     } catch {
-      setError('Failed to fetch price. Ensure the screener service is running on port 3004.');
+      setError('Failed to fetch price. Ensure the engine API is running.');
       setPrice(null);
     } finally {
       setLoading(false);

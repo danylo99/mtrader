@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Edit3, XCircle, Trash2, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, Edit3, XCircle, Trash2, SlidersHorizontal, Pencil } from 'lucide-react';
 import engineFetch from '@/lib/api';
 import type { TradingSetup, Order } from '@/lib/types';
 import { TIMEFRAMES, INDICATORS, STATUS_STYLES, parseTpPrices } from '@/lib/constants';
@@ -44,6 +44,12 @@ export default function SetupDetailPage({ params }: { params: Promise<{ id: stri
   const [slSubmitting, setSlSubmitting] = useState(false);
   const [slError, setSlError] = useState('');
   const [slWarning, setSlWarning] = useState('');
+
+  const [tpEditOrder, setTpEditOrder] = useState<Order | null>(null);
+  const [tpEditPrice, setTpEditPrice] = useState('');
+  const [tpEditQty, setTpEditQty] = useState('');
+  const [tpEditSubmitting, setTpEditSubmitting] = useState(false);
+  const [tpEditError, setTpEditError] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -96,7 +102,6 @@ export default function SetupDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   async function submitClose() {
-    const remaining = setup?.remaining_qty ?? 0;
     const raw = closeQty.trim();
     const qty = raw === '' ? 0 : Number(raw);
 
@@ -106,10 +111,6 @@ export default function SetupDetailPage({ params }: { params: Promise<{ id: stri
     }
     if (qty < 0) {
       setCloseError('Quantity cannot be negative');
-      return;
-    }
-    if (qty > remaining + 1e-9) {
-      setCloseError(`Quantity ${qty} exceeds the remaining position of ${remaining}`);
       return;
     }
 
@@ -161,6 +162,54 @@ export default function SetupDetailPage({ params }: { params: Promise<{ id: stri
       setSlError(e?.error || e?.message || 'Failed to modify stop loss');
     } finally {
       setSlSubmitting(false);
+    }
+  }
+
+  function openTpEditModal(order: Order) {
+    setTpEditOrder(order);
+    setTpEditPrice(String(order.price));
+    setTpEditQty(String(order.qty));
+    setTpEditError('');
+  }
+
+  async function handleCancelOrder(orderId: number) {
+    if (!confirm('Cancel this order?')) return;
+    try {
+      await engineFetch(`/api/orders/${orderId}/cancel`, { method: 'POST' });
+      await load();
+    } catch (err: unknown) {
+      const e = err as { error?: string; message?: string };
+      alert(e?.error || e?.message || 'Failed to cancel order');
+    }
+  }
+
+  async function submitTpEdit() {
+    if (!tpEditOrder) return;
+    const price = Number(tpEditPrice);
+    const qty = Number(tpEditQty);
+    if (!Number.isFinite(price) || price <= 0) {
+      setTpEditError('Price must be a positive number');
+      return;
+    }
+    if (!Number.isFinite(qty) || qty <= 0) {
+      setTpEditError('Quantity must be a positive number');
+      return;
+    }
+
+    setTpEditSubmitting(true);
+    setTpEditError('');
+    try {
+      await engineFetch(`/api/orders/${tpEditOrder.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ price, qty }),
+      });
+      setTpEditOrder(null);
+      await load();
+    } catch (err: unknown) {
+      const e = err as { error?: string; message?: string };
+      setTpEditError(e?.error || e?.message || 'Failed to modify TP order');
+    } finally {
+      setTpEditSubmitting(false);
     }
   }
 
@@ -369,6 +418,20 @@ export default function SetupDetailPage({ params }: { params: Promise<{ id: stri
                         {order.status}
                       </span>
                     </td>
+                    <td className="py-2.5 px-3 text-right">
+                      {order.status === 'pending' && order.order_type.startsWith('tp') && (
+                        <div className="flex gap-1">
+                          <button onClick={() => openTpEditModal(order)}
+                            className="rounded border border-slate-600 px-1.5 py-0.5 text-xs text-slate-400 hover:border-blue-500 hover:text-blue-400">
+                            Edit
+                          </button>
+                          <button onClick={() => handleCancelOrder(order.id)}
+                            className="rounded border border-slate-600 px-1.5 py-0.5 text-xs text-red-400 hover:border-red-500">
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -444,6 +507,40 @@ export default function SetupDetailPage({ params }: { params: Promise<{ id: stri
           </div>
         )}
       </Modal>
+
+      {tpEditOrder && (
+        <Modal
+          open={!!tpEditOrder}
+          title={`Edit ${ORDER_TYPE_LABELS[tpEditOrder.order_type] || tpEditOrder.order_type}`}
+          onClose={() => !tpEditSubmitting && setTpEditOrder(null)}
+          footer={
+            <>
+              <button onClick={() => setTpEditOrder(null)} disabled={tpEditSubmitting}
+                className="rounded-lg bg-slate-700 px-3 py-2 text-sm text-white hover:bg-slate-600 disabled:opacity-50">
+                Cancel
+              </button>
+              <button onClick={submitTpEdit} disabled={tpEditSubmitting}
+                className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50">
+                {tpEditSubmitting ? 'Saving…' : 'Save'}
+              </button>
+            </>
+          }
+        >
+          <label className="mb-1 block text-sm text-slate-400">Price</label>
+          <input type="number" step="any" value={tpEditPrice}
+            onChange={e => setTpEditPrice(e.target.value)}
+            className={INPUT_CLASS} />
+          <label className="mt-3 mb-1 block text-sm text-slate-400">Quantity</label>
+          <input type="number" step="any" min="0" value={tpEditQty}
+            onChange={e => setTpEditQty(e.target.value)}
+            className={INPUT_CLASS} />
+          {tpEditError && (
+            <div className="mt-3 rounded-lg border border-red-900/50 bg-red-900/20 px-3 py-2 text-sm text-red-300">
+              {tpEditError}
+            </div>
+          )}
+        </Modal>
+      )}
     </div>
   );
 }

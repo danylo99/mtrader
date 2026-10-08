@@ -192,24 +192,22 @@ class EntryService {
       });
 
       for (let i = 0; i < tpPrices.length; i++) {
-        const tpOrder = await exchangeService.exchange.createOrder(
-          setup.symbol,
-          'limit',
-          setup.side === 'long' ? 'sell' : 'buy',
-          tpQtys[i],
-          tpPrices[i],
-          {
-              reduceOnly: true,
-              positionIdx: 0
-          }
-        );
+        const tpOrder = await exchangeService.placeOrder({
+          symbol: setup.symbol,
+          side: setup.side === 'long' ? 'sell' : 'buy',
+          orderType: 'limit',
+          qty: tpQtys[i].toString(),
+          price: tpPrices[i],
+          reduceOnly: true,
+          positionIdx: 0,
+        });
         await this.db.createOrder({
           setup_id: setup.id,
           order_type: `tp${i + 1}`,
           side: setup.side === 'long' ? 'sell' : 'buy',
           price: tpPrices[i],
           qty: tpQtys[i],
-          exchange_order_id: tpOrder.id,
+          exchange_order_id: tpOrder.orderId,
           status: 'pending'
         });
         await sleep(200);
@@ -392,21 +390,22 @@ class EntryService {
       });
 
       for (let i = 0; i < tpPrices.length; i++) {
-        const tpOrder = await exchangeService.exchange.createOrder(
+        const tpOrder = await exchangeService.placeOrder({
           symbol,
-          'limit',
-          side === 'long' ? 'sell' : 'buy',
-          tpQtys[i],
-          tpPrices[i],
-          { reduceOnly: true, positionIdx: 0 }
-        );
+          side: side === 'long' ? 'sell' : 'buy',
+          orderType: 'limit',
+          qty: tpQtys[i].toString(),
+          price: tpPrices[i],
+          reduceOnly: true,
+          positionIdx: 0,
+        });
         await db.createOrder({
           setup_id: setupId,
           order_type: `tp${i + 1}`,
           side: side === 'long' ? 'sell' : 'buy',
           price: tpPrices[i],
           qty: tpQtys[i],
-          exchange_order_id: tpOrder.id,
+          exchange_order_id: tpOrder.orderId,
           status: 'pending'
         });
       }
@@ -519,14 +518,15 @@ class EntryService {
       });
 
       for (let i = 0; i < tpPrices.length; i++) {
-        const tpOrder = await exchangeService.exchange.createOrder(
-          setup.symbol,
-          'limit',
-          setup.side === 'long' ? 'sell' : 'buy',
-          tpQtys[i],
-          tpPrices[i],
-          { reduceOnly: true, positionIdx: 0 }
-        );
+        const tpOrder = await exchangeService.placeOrder({
+          symbol: setup.symbol,
+          side: setup.side === 'long' ? 'sell' : 'buy',
+          orderType: 'limit',
+          qty: tpQtys[i].toString(),
+          price: tpPrices[i],
+          reduceOnly: true,
+          positionIdx: 0,
+        });
         await this.db.createOrder({
           setup_id: setup.id,
           order_type: `tp${i + 1}`,
@@ -658,24 +658,22 @@ class EntryService {
       });
 
       for (let i = 0; i < tpPrices.length; i++) {
-        const tpOrder = await exchangeService.exchange.createOrder(
-          setup.symbol,
-          'limit',
-          setup.side === 'long' ? 'sell' : 'buy',
-          tpQtys[i],
-          tpPrices[i],
-          {
-              reduceOnly: true,
-              positionIdx: 0
-          }
-        );
+        const tpOrder = await exchangeService.placeOrder({
+          symbol: setup.symbol,
+          side: setup.side === 'long' ? 'sell' : 'buy',
+          orderType: 'limit',
+          qty: tpQtys[i].toString(),
+          price: tpPrices[i],
+          reduceOnly: true,
+          positionIdx: 0,
+        });
         await ctx.db.createOrder({
           setup_id: setup.id,
           order_type: `tp${i + 1}`,
           side: setup.side === 'long' ? 'sell' : 'buy',
           price: tpPrices[i],
           qty: tpQtys[i],
-          exchange_order_id: tpOrder.id,
+          exchange_order_id: tpOrder.orderId,
           status: 'pending'
         });
       }

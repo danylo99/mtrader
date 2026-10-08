@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Database = require('../../db/database');
 const EntryService = require('../../services/entryService');
+const ExchangeServiceManager = require('../../services/exchangeServiceManager');
 const TelegramService = require('../../services/telegramService');
 const auth = require('../middleware/auth');
 
@@ -113,6 +114,70 @@ router.post('/place', auth, async (req, res) => {
     }
   } catch (err) {
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// Cancel a pending order
+router.post('/:id/cancel', auth, async (req, res) => {
+  try {
+    const orderId = Number(req.params.id);
+    const order = await db.getOrderById(orderId);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const setup = await db.getSetupById(order.setup_id);
+    if (!setup || setup.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+    if (order.status !== 'pending') return res.status(400).json({ error: 'Only pending orders can be cancelled' });
+
+    const exchangeService = await ExchangeServiceManager.getOrCreateFromSetup(setup);
+    if (order.exchange_order_id) {
+      await exchangeService.cancelOrder(order.exchange_order_id, setup.symbol);
+    }
+    await db.updateOrderStatus(orderId, 'canceled');
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Modify a pending TP order (cancel + place new)
+router.put('/:id', auth, async (req, res) => {
+  try {
+    const orderId = Number(req.params.id);
+    const order = await db.getOrderById(orderId);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (!order.order_type.startsWith('tp')) return res.status(400).json({ error: 'Only TP orders can be modified' });
+
+    const setup = await db.getSetupById(order.setup_id);
+    if (!setup || setup.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+    if (order.status !== 'pending') return res.status(400).json({ error: 'Only pending orders can be modified' });
+
+    const { price, qty } = req.body || {};
+    if (!price || !qty) return res.status(400).json({ error: 'price and qty are required' });
+
+    const exchangeService = await ExchangeServiceManager.getOrCreateFromSetup(setup);
+    if (order.exchange_order_id) {
+      await exchangeService.cancelOrder(order.exchange_order_id, setup.symbol);
+    }
+
+    const newOrder = await exchangeService.placeOrder({
+      symbol: setup.symbol,
+      side: order.side,
+      orderType: 'limit',
+      qty: qty,
+      price: price,
+      reduceOnly: true,
+      positionIdx: 0,
+    });
+
+    await db.updateOrder(order.id, {
+      price: price,
+      qty: qty,
+      exchange_order_id: newOrder.orderId,
+    });
+
+    res.json({ success: true, data: { orderId: newOrder.orderId, price, qty } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

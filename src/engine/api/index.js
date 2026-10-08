@@ -15,5 +15,6 @@ router.use('/ew-subscriptions', require('./routes/ewSubscriptions'));
 router.use('/mazscore-subscriptions', require('./routes/mazscoreSubscriptions'));
 router.use('/supertrend-subscriptions', require('./routes/supertrendSubscriptions'));
 router.use('/price-alarms', require('./routes/priceAlarms'));
+router.use('/candles', require('./routes/candles'));
 
 module.exports = router;

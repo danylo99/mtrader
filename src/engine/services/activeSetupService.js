@@ -470,11 +470,8 @@ static async checkBreakEven(ctx, setup, exchangeService) {
     if (!(qty > 0)) {
       throw ActiveSetupService.badRequest(`Quantity ${parsedQty} is below the exchange minimum for ${setup.symbol}`);
     }
-    if (qty > remainingQty + 1e-9) {
-      throw ActiveSetupService.badRequest(`Quantity ${qty} exceeds remaining position ${remainingQty}`);
-    }
 
-    const newEntryQty = remainingQty - qty;
+    const newEntryQty = Math.max(0, remainingQty - qty);
 
     let closePrice = null;
     if (exchangeService.exchangeName === 'hyperliquid') {

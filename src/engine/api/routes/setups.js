@@ -217,9 +217,6 @@ router.post('/:id/close', auth, async (req, res) => {
     if (remainingQty <= 0) {
       return res.status(400).json({ error: 'Position is already flat' });
     }
-    if (rawQty > remainingQty + 1e-9) {
-      return res.status(400).json({ error: `Quantity ${rawQty} exceeds remaining position ${remainingQty}` });
-    }
 
     const exchangeService = await ExchangeServiceManager.getOrCreateFromSetup(setup);
     const result = await ActiveSetupService.manualClosePosition(db, telegramService, setup, exchangeService, rawQty);

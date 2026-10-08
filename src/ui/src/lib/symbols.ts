@@ -8,6 +8,7 @@ export interface SymbolOption {
 export interface SymbolsMap {
   [exchange: string]: {
     symbols: SymbolOption[];
+    assets: Asset[];
     intervals: string[];
   };
 }
@@ -42,7 +43,7 @@ export async function getExchanges(): Promise<string[]> {
 
 export async function getAssets(): Promise<Asset[]> {
   const map = await getSymbolsMap();
-  return ((map['hyperliquid']?.symbols || []) as unknown) as Asset[];
+  return ((map['hyperliquid']?.assets || []) as unknown) as Asset[];
 }
 
 export function assetFromSymbol(symbolCcxt: string, assets: Asset[]): Asset | undefined {

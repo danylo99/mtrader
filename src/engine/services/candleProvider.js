@@ -2,6 +2,7 @@ const ccxt = require('ccxt');
 const logger = require('../logger');
 const { getCcxtConfig } = require('../config/exchanges');
 const TwelveDataProvider = require('./twelveDataProvider');
+const CandleUtils = require('../utils/candleUtils');
 
 function getCcxtInterval(timeframe) {
   const map = { m1: '1m', m5: '5m', m15: '15m', m30: '30m', h1: '1h', h2: '2h', h4: '4h', d1: '1d', w1: '1w' };
@@ -178,6 +179,7 @@ class CandleProvider {
 
     for (const asset of this.assets) {
       for (const timeframe of this.timeframes) {
+        if (asset.provider === 'twelvedata' && timeframe === 'm1') continue;
         const key = `${asset.symbol_ccxt}:${timeframe}`;
         let success = false;
         let retries = 3;
@@ -210,13 +212,18 @@ class CandleProvider {
 
             if (isRateLimit && retries > 1) {
               retries--;
-              await this.sleep(2000);
+              const backoff = asset.provider === 'twelvedata' ? 30000 : 2000;
+              await this.sleep(backoff);
               continue;
             }
-            logger.error(`Historical fetch failed for ${key}:`, error.message);
+            logger.error(`Historical fetch failed for ${key}: ${error.message}`);
             errors.push({ symbol: asset.symbol_ccxt, timeframe, error: error.message });
             break;
           }
+        }
+
+        if (asset.provider === 'twelvedata') {
+          await this.sleep(7500); // Throttle: free tier ~8 req/min
         }
       }
     }
@@ -237,10 +244,10 @@ class CandleProvider {
     const twelvedataAssets = this.assets.filter(a => a.provider === 'twelvedata');
     if (twelvedataAssets.length === 0) return;
 
-    // Poll only the primary timeframe (m1) to stay within free-tier rate limit (~8 req/min)
-    // 5 assets × 1 timeframe = 5 req/60s = 5 req/min, well under the limit
-    const primaryTf = this.timeframes[0] || 'm1';
-    logger.info(`Starting TwelveData polling for ${twelvedataAssets.length} assets on ${primaryTf} every 60s`);
+    // Poll m5 every 5min, aggregate into higher timeframes
+    // 3 assets × 1 request/5min = 0.6 req/min, well under ~8 req/min limit
+    const primaryTf = 'm5';
+    logger.info(`Starting TwelveData polling for ${twelvedataAssets.length} assets on ${primaryTf} every 5min`);
 
     const timer = setInterval(async () => {
       for (const asset of twelvedataAssets) {
@@ -254,7 +261,7 @@ class CandleProvider {
           logger.error(`TwelveData poll error for ${asset.symbol_ccxt} ${primaryTf}:`, err.message);
         }
       }
-    }, 60000);
+    }, 300000);
 
     this.pollTimers.push(timer);
   }
@@ -311,9 +318,53 @@ class CandleProvider {
         const closedBars = this.getClosedCandles(symbol, timeframe);
         this.onScreenerUpdate(symbol, timeframe, closedBars);
       }
+
+      // Aggregate into higher timeframes
+      if (timeframe === 'm5') {
+        this._aggregateTwelveDataTimeframes(symbol);
+      }
     } else if (raw[0] === current[0]) {
       this.currentCandles.set(key, raw);
     }
+  }
+
+  _aggregateTwelveDataTimeframes(symbol) {
+    const m5Candles = this.store.get(`${symbol}:m5`);
+    if (!m5Candles || m5Candles.length < 2) return;
+
+    const higherTfs = this.timeframes.filter(tf => tf !== 'm1' && tf !== 'm5');
+    for (const tf of higherTfs) {
+      try {
+        const aggregated = CandleUtils.aggregateOHLCV(m5Candles, 'm5', tf);
+        if (aggregated.length === 0) continue;
+
+        const tfKey = `${symbol}:${tf}`;
+        const existing = this.store.get(tfKey);
+        const merged = this._mergeAggregatedCandles(existing, aggregated);
+        this.store.set(tfKey, merged);
+        this.currentCandles.set(tfKey, merged[merged.length - 1]);
+
+        if (typeof this.onScreenerUpdate === 'function') {
+          const closedBars = this.getClosedCandles(symbol, tf);
+          this.onScreenerUpdate(symbol, tf, closedBars);
+        }
+      } catch (err) {
+        logger.error(`TwelveData aggregation error for ${symbol} ${tf}:`, err.message);
+      }
+    }
+  }
+
+  _mergeAggregatedCandles(existing, aggregated) {
+    if (!existing || existing.length === 0) return aggregated;
+
+    const existingMap = new Map();
+    for (const c of existing) existingMap.set(c[0], c);
+
+    for (const c of aggregated) existingMap.set(c[0], c);
+
+    const merged = [...existingMap.entries()].sort((a, b) => a[0] - b[0]).map(e => e[1]);
+    while (merged.length > this.limit) merged.shift();
+    return merged;
   }
 
   handleWsCandle(topic, raw, confirm) {
