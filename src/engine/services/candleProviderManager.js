@@ -12,6 +12,8 @@ class CandleProviderManager {
   }
 
   async getClosedCandles(exchangeName, symbol, timeframe) {
+    // exchangeName is ignored; candles come from the unified CandleProvider
+    // which routes bybit → Bybit WS/REST and twelvedata → TwelveData REST/poll
     try {
       const response = await this.axios.get(`/candles/${symbol}/${timeframe}`);
       if (response.status === 200 && Array.isArray(response.data) && response.data.length > 0) {

@@ -1,0 +1,192 @@
+{
+  "intervals": ["m1", "m5", "m15", "h1", "h4", "d1"],
+  "assets": [
+    {
+      "id": "btc",
+      "display": "BTCUSDC.P",
+      "symbol_ccxt": "BTC/USDC:USDC",
+      "symbol_hyperliquid": "BTC-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "eth",
+      "display": "ETHUSDC.P",
+      "symbol_ccxt": "ETH/USDC:USDC",
+      "symbol_hyperliquid": "ETH-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "sol",
+      "display": "SOLUSDC.P",
+      "symbol_ccxt": "SOL/USDC:USDC",
+      "symbol_hyperliquid": "SOL-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "xrp",
+      "display": "XRPUSDC.P",
+      "symbol_ccxt": "XRP/USDC:USDC",
+      "symbol_hyperliquid": "XRP-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "hype",
+      "display": "HYPEUSDC.P",
+      "symbol_ccxt": "HYPE/USDC:USDC",
+      "symbol_hyperliquid": "HYPE-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "doge",
+      "display": "DOGEUSDC.P",
+      "symbol_ccxt": "DOGE/USDC:USDC",
+      "symbol_hyperliquid": "DOGE-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "ada",
+      "display": "ADAUSDC.P",
+      "symbol_ccxt": "ADA/USDC:USDC",
+      "symbol_hyperliquid": "ADA-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "near",
+      "display": "NEARUSDC.P",
+      "symbol_ccxt": "NEAR/USDC:USDC",
+      "symbol_hyperliquid": "NEAR-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "aave",
+      "display": "AAVEUSDC.P",
+      "symbol_ccxt": "AAVE/USDC:USDC",
+      "symbol_hyperliquid": "AAVE-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "sui",
+      "display": "SUIUSDC.P",
+      "symbol_ccxt": "SUI/USDC:USDC",
+      "symbol_hyperliquid": "SUI-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "link",
+      "display": "LINKUSDC.P",
+      "symbol_ccxt": "LINK/USDC:USDC",
+      "symbol_hyperliquid": "LINK-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "bnb",
+      "display": "BNBUSDC.P",
+      "symbol_ccxt": "BNB/USDC:USDC",
+      "symbol_hyperliquid": "BNB-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "uni",
+      "display": "UNIUSDC.P",
+      "symbol_ccxt": "UNI/USDC:USDC",
+      "symbol_hyperliquid": "UNI-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "avax",
+      "display": "AVAXUSDC.P",
+      "symbol_ccxt": "AVAX/USDC:USDC",
+      "symbol_hyperliquid": "AVAX-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "inj",
+      "display": "INJUSDC.P",
+      "symbol_ccxt": "INJ/USDC:USDC",
+      "symbol_hyperliquid": "INJ-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "op",
+      "display": "OPUSDC.P",
+      "symbol_ccxt": "OP/USDC:USDC",
+      "symbol_hyperliquid": "OP-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "arb",
+      "display": "ARBUSDC.P",
+      "symbol_ccxt": "ARB/USDC:USDC",
+      "symbol_hyperliquid": "ARB-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "trx",
+      "display": "TRXUSDC.P",
+      "symbol_ccxt": "TRX/USDC:USDC",
+      "symbol_hyperliquid": "TRX-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "sei",
+      "display": "SEIUSDC.P",
+      "symbol_ccxt": "SEI/USDC:USDC",
+      "symbol_hyperliquid": "SEI-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "atom",
+      "display": "ATOMUSDC.P",
+      "symbol_ccxt": "ATOM/USDC:USDC",
+      "symbol_hyperliquid": "ATOM-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "algo",
+      "display": "ALGOUSDC.P",
+      "symbol_ccxt": "ALGO/USDC:USDC",
+      "symbol_hyperliquid": "ALGO-USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "silver",
+      "display": "SILVERUSDC.P",
+      "symbol_ccxt": "XYZ-SILVER/USDC:USDC",
+      "symbol_hyperliquid": "XYZ-SILVER-USDC:USDC",
+      "symbol_twelvedata": "XAG/USD",
+      "provider": "twelvedata"
+    },
+    {
+      "id": "gold",
+      "display": "GOLDUSDC.P",
+      "symbol_ccxt": "XYZ-GOLD/USDC:USDC",
+      "symbol_hyperliquid": "XYZ-GOLD-USDC:USDC",
+      "symbol_twelvedata": "XAU/USD",
+      "provider": "twelvedata"
+    },
+    {
+      "id": "jpy",
+      "display": "JPY",
+      "symbol_ccxt": "XYZ-JPY/USDC:USDC",
+      "symbol_hyperliquid": "XYZ-JPY-USDC:USDC",
+      "symbol_twelvedata": "USD/JPY",
+      "provider": "twelvedata"
+    },
+    {
+      "id": "eur",
+      "display": "EUR",
+      "symbol_ccxt": "XYZ-EUR/USDC:USDC",
+      "symbol_hyperliquid": "XYZ-EUR-USDC:USDC",
+      "symbol_twelvedata": "EUR/USD",
+      "provider": "twelvedata"
+    },
+    {
+      "id": "sp500",
+      "display": "SP500",
+      "symbol_ccxt": "XYZ-SP500/USDC:USDC",
+      "symbol_hyperliquid": "XYZ-SP500-USDC:USDC",
+      "symbol_twelvedata": "SPX",
+      "provider": "twelvedata"
+    }
+  ]
+}

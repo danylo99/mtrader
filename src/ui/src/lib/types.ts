@@ -4,7 +4,7 @@ export type EntryIndicatorType = 'supertrend' | 'rollingsupertrend' | 'rollingsu
 export type ScreenerIndicatorType = 'supertrend' | 'rollingsupertrend' | 'rollingsupertrend2' | 'macd' | 'ema' | 'ewt';
 export type Timeframe = 'm1' | 'm5' | 'm15' | 'm30' | 'h1' | 'h2' | 'h4' | 'd1' | 'w1';
 export type RiskType = 'percent' | 'fixed';
-export type OrderType = 'entry' | 'tp1' | 'tp2' | 'tp3' | 'tp4' | 'sl';
+export type OrderType = 'entry' | 'tp1' | 'tp2' | 'tp3' | 'tp4' | 'sl' | 'manual_close';
 export type OrderSide = 'buy' | 'sell';
 export type OrderStatus = 'pending' | 'filled' | 'cancelled' | 'rejected';
 
@@ -60,6 +60,7 @@ export interface TradingSetup {
   closed_at: string | null;
   created_at: string;
   updated_at: string;
+  remaining_qty?: number;
 }
 
 export interface SetupListSummary {

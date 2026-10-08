@@ -2,24 +2,23 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 
-function loadSymbolsConfig(filename) {
+function loadAssetsConfig() {
   const dir = __dirname;
-  // Dev: ../../../config/ → project_root/src/config/
-  // Docker: ../../../../config/ → /app/config/
   try {
-    return require(path.resolve(dir, '../../../config/symbols', filename));
+    return require(path.resolve(dir, '../../../config/symbols/assets.json'));
   } catch {
-    return require(path.resolve(dir, '../../../../config/symbols', filename));
+    return require(path.resolve(dir, '../../../../config/symbols/assets.json'));
   }
 }
 
-const bybitSymbols = loadSymbolsConfig('bybit.json');
-const hyperliquidSymbols = loadSymbolsConfig('hyperliquid.json');
+const assetsConfig = loadAssetsConfig();
+const allAssets = assetsConfig.assets;
+const intervals = assetsConfig.intervals;
 
 router.get('/', (req, res) => {
   res.json({
-    bybit: bybitSymbols,
-    hyperliquid: hyperliquidSymbols,
+    bybit: { symbols: allAssets.filter(a => a.provider === 'bybit'), intervals },
+    hyperliquid: { symbols: allAssets, intervals },
   });
 });
 
@@ -28,9 +27,9 @@ router.get('/:exchange', (req, res) => {
 
   switch (exchange) {
     case 'bybit':
-      return res.json(bybitSymbols);
+      return res.json({ symbols: allAssets.filter(a => a.provider === 'bybit'), intervals });
     case 'hyperliquid':
-      return res.json(hyperliquidSymbols);
+      return res.json({ symbols: allAssets, intervals });
     default:
       return res.status(404).json({ error: `Unknown exchange: ${exchange}` });
   }

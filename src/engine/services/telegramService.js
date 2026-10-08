@@ -13,7 +13,9 @@ class TelegramService {
     'tp_hit',
     'sl_hit',
     'be_activated',
-    'exit_triggered'
+    'exit_triggered',
+    'manual_close',
+    'sl_modified'
   ]);
 
   static SCREENER_MESSAGE_TYPES = new Set([
@@ -152,6 +154,12 @@ class TelegramService {
       case 'exit_triggered':
         message += this.formatExitTriggered(payload);
         break;
+      case 'manual_close':
+        message += this.formatManualClose(payload);
+        break;
+      case 'sl_modified':
+        message += this.formatSlModified(payload);
+        break;
       case 'error':
         message += this.formatError(payload);
         break;
@@ -200,6 +208,10 @@ class TelegramService {
         return this.formatBeActivated(data);
       case 'exit_triggered':
         return this.formatExitTriggered(data);
+      case 'manual_close':
+        return this.formatManualClose(data);
+      case 'sl_modified':
+        return this.formatSlModified(data);
       default:
         return this.formatCompactTradingMessage(
           ['NOTIFICATION', data.symbol, messageType],
@@ -222,6 +234,8 @@ class TelegramService {
         case 'sl_hit':
         case 'be_activated':
         case 'exit_triggered':
+        case 'manual_close':
+        case 'sl_modified':
         case 'supply_demand_zone':
           if (data && data.setupId && data.symbol) {
             const side = data.side ? ` • ${data.side.toUpperCase()}` : '';
@@ -352,6 +366,31 @@ class TelegramService {
     );
   }
 
+  formatManualClose(data) {
+    const payload = data || {};
+    const side = this.getSideAction(payload.side);
+    const remaining = payload.remainingQty !== undefined && payload.remainingQty !== null
+      ? ` · LEFT ${payload.remainingQty}`
+      : '';
+
+    return this.formatCompactTradingMessage(
+      [`MANUAL CLOSE ${payload.quantity ?? ''}`, payload.symbol, 'CLOSED' + remaining],
+      side.emoji,
+      payload.price,
+      payload.timestamp
+    );
+  }
+
+  formatSlModified(data) {
+    const payload = data || {};
+    return this.formatCompactTradingMessage(
+      ['SL', payload.symbol, 'MODIFIED'],
+      '🎚️',
+      payload.newPrice,
+      payload.timestamp
+    );
+  }
+
   formatError(data) {
     const payload = data || {};
     return `❌ Error: ${payload.error || 'Unknown error'}
@@ -450,6 +489,8 @@ Price: ${this.formatPrice(price)}  ·  ${this.formatBatchTimestamp(timestamp)}
       'sl_hit': '🛑',
       'be_activated': '🛡️',
       'exit_triggered': '🚪',
+      'manual_close': '✂️',
+      'sl_modified': '🎚️',
       'screener_reversal': '🔔',
       'price_alarm': '🔔',
       'supply_demand_zone': '🏢',
@@ -470,6 +511,8 @@ Price: ${this.formatPrice(price)}  ·  ${this.formatBatchTimestamp(timestamp)}
       'sl_hit': 'Stop Loss Hit',
       'be_activated': 'Break-Even Activated',
       'exit_triggered': 'Exit Triggered',
+      'manual_close': 'Manual Close',
+      'sl_modified': 'Stop Loss Modified',
       'screener_reversal': 'Screener Alert',
       'price_alarm': 'Price Alarm',
       'supply_demand_zone': 'Zone Alert',

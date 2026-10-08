@@ -1,21 +1,56 @@
 const express = require('express');
 const router = express.Router();
 const Database = require('../../db/database');
+const ActiveSetupService = require('../../services/activeSetupService');
+const ExchangeServiceManager = require('../../services/exchangeServiceManager');
+const TelegramService = require('../../services/telegramService');
 const auth = require('../middleware/auth');
 
 const db = new Database();
 db.connect().catch(() => {});
+const telegramService = new TelegramService(db);
+
+// Manual close / SL modify mutate both the exchange and the DB, so two
+// concurrent requests on the same setup would race each other.
+const inFlight = new Set();
 
 function normalizeIndicatorType(type) {
   if (!type) return type;
   return type.toLowerCase().replace('ewtrading', 'ewt');
 }
 
+// Optional client-driven sort for the list route. Allow-listed: an unknown
+// value leaves the SQL `created_at DESC` order untouched.
+const SORT_COMPARATORS = {
+  symbol_asc: (a, b) => String(a.symbol ?? '').localeCompare(String(b.symbol ?? '')),
+  symbol_desc: (a, b) => String(b.symbol ?? '').localeCompare(String(a.symbol ?? '')),
+};
+
+// Shared guard chain for the trade-management routes. Returns the setup, or
+// null after having already written a response.
+async function loadOwnedActiveSetup(req, res) {
+  const id = Number(req.params.id);
+  const setup = await db.getSetupById(id);
+  if (!setup) {
+    res.status(404).json({ error: 'Not found' });
+    return null;
+  }
+  if (setup.user_id !== req.user.id) {
+    res.status(403).json({ error: 'Forbidden' });
+    return null;
+  }
+  if (setup.status !== 'active') {
+    res.status(400).json({ error: 'Only active setups can be modified' });
+    return null;
+  }
+  return setup;
+}
+
 // List setups with optional status, pagination, search
 router.get('/', auth, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { status, page = 1, limit = 50, search } = req.query;
+    const { status, page = 1, limit = 50, search, sort } = req.query;
 
     let rows = [];
     if (status) {
@@ -52,6 +87,11 @@ router.get('/', auth, async (req, res) => {
       const q = String(search).toLowerCase();
       rows = rows.filter(r => (r.symbol && r.symbol.toLowerCase().includes(q)) || (r.memo && r.memo.toLowerCase().includes(q)));
     }
+
+    // optional sort, after search and before pagination so the ordering holds
+    // across page boundaries. Array#sort is stable, so ties keep created_at DESC.
+    const comparator = SORT_COMPARATORS[String(sort || '')];
+    if (comparator) rows.sort(comparator);
 
     // pagination
     const p = Math.max(1, parseInt(String(page), 10));
@@ -120,7 +160,8 @@ router.get('/:id', auth, async (req, res) => {
     if (setup.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
 
     const orders = await db.getOrdersBySetupId(id);
-    res.json({ success: true, data: { ...setup, orders } });
+    const remainingQty = ActiveSetupService.getRemainingQty(setup, orders);
+    res.json({ success: true, data: { ...setup, orders, remaining_qty: remainingQty } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -152,6 +193,66 @@ router.put('/:id', auth, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Manual close: qty omitted, null, 0 or negative closes the whole position
+router.post('/:id/close', auth, async (req, res) => {
+  const id = Number(req.params.id);
+  if (inFlight.has(id)) return res.status(409).json({ error: 'Another action is already in progress for this setup' });
+  inFlight.add(id);
+
+  try {
+    const setup = await loadOwnedActiveSetup(req, res);
+    if (!setup) return;
+
+    const payload = req.body || {};
+    const rawQty = payload.qty === undefined || payload.qty === null || payload.qty === '' ? 0 : Number(payload.qty);
+    if (!Number.isFinite(rawQty)) {
+      return res.status(400).json({ error: 'Quantity must be a number' });
+    }
+
+    const orders = await db.getOrdersBySetupId(setup.id);
+    const remainingQty = ActiveSetupService.getRemainingQty(setup, orders);
+    if (remainingQty <= 0) {
+      return res.status(400).json({ error: 'Position is already flat' });
+    }
+    if (rawQty > remainingQty + 1e-9) {
+      return res.status(400).json({ error: `Quantity ${rawQty} exceeds remaining position ${remainingQty}` });
+    }
+
+    const exchangeService = await ExchangeServiceManager.getOrCreateFromSetup(setup);
+    const result = await ActiveSetupService.manualClosePosition(db, telegramService, setup, exchangeService, rawQty);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  } finally {
+    inFlight.delete(id);
+  }
+});
+
+// Replace the live stop order with a new price
+router.patch('/:id/sl', auth, async (req, res) => {
+  const id = Number(req.params.id);
+  if (inFlight.has(id)) return res.status(409).json({ error: 'Another action is already in progress for this setup' });
+  inFlight.add(id);
+
+  try {
+    const setup = await loadOwnedActiveSetup(req, res);
+    if (!setup) return;
+
+    const slPrice = (req.body || {}).sl_price;
+    if (slPrice === undefined || slPrice === null || slPrice === '') {
+      return res.status(400).json({ error: 'sl_price is required' });
+    }
+
+    const exchangeService = await ExchangeServiceManager.getOrCreateFromSetup(setup);
+    const result = await ActiveSetupService.modifyStopLoss(db, telegramService, setup, exchangeService, slPrice);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  } finally {
+    inFlight.delete(id);
   }
 });
 

@@ -53,6 +53,10 @@ class Config {
     return process.env.SCHEDULE_PATTERN || '0,15,30,45 * * * *';
   }
 
+  static getTwelveDataApiKey() {
+    return process.env.TWELVEDATA_API_KEY;
+  }
+
   static getLogLevel() {
     return process.env.LOG_LEVEL || 'info';
   }

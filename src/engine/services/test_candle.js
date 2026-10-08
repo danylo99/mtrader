@@ -1,8 +1,12 @@
 const CandleProvider = require('./candleProvider.js');
 
+const testAssets = [
+  { id: 'btc', display: 'BTCUSDC.P', symbol_ccxt: 'BTC/USDT:USDT', symbol_hyperliquid: 'BTC-USDT:USDT', provider: 'bybit' },
+  { id: 'eth', display: 'ETHUSDC.P', symbol_ccxt: 'ETH/USDT:USDT', symbol_hyperliquid: 'ETH-USDT:USDT', provider: 'bybit' },
+];
+
 const testProvider = new CandleProvider({
-  exchange: 'bybit',
-  symbols: ['BTC/USDT:USDT', 'ETH/USDT:USDT'],
+  assets: testAssets,
   timeframes: ['m5'],
   limit: 100,
   onUpdate: (symbol, timeframe, candle) => {
@@ -19,7 +23,6 @@ testProvider.start().catch(err => {
   process.exit(1);
 });
 
-// Stop after 30 seconds
 setTimeout(() => {
   console.log('Stopping after 30 seconds...');
   testProvider.stop().then(() => {

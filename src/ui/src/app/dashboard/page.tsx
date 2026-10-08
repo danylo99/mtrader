@@ -8,6 +8,7 @@ import { parseTpPrices } from '@/lib/constants';
 import type { TradingSetup, SetupListSummary } from '@/lib/types';
 
 type TabType = 'pending' | 'triggered' | 'active' | 'closed';
+type SortType = 'symbol_asc' | 'symbol_desc';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   pending:    { label: 'Pending',    color: 'text-yellow-400', bg: 'bg-yellow-900/20 border-yellow-700/30' },
@@ -67,12 +68,20 @@ function SetupCardRaw({ setup, onCancel, onDelete }: {
           <p className="text-white text-xs sm:text-sm">{tpArr.length > 0 ? `${tpArr.length}x RR: ${tpArr.join(':')}` : '—'}</p>
         </div>
         {(setup.status === 'active' || setup.status === 'closed' || setup.status === 'cancelled') && (
-          <div>
-            <p className="text-xs text-slate-500">Profit</p>
-            <p className={`font-mono text-xs sm:text-sm ${setup.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {setup.profit >= 0 ? `+${setup.profit.toFixed(2)}` : setup.profit.toFixed(2)}
-            </p>
-          </div>
+          <>
+            <div>
+              <p className="text-xs text-slate-500">Open Price</p>
+              <p className="font-mono text-white text-xs sm:text-sm">
+                {setup.entry_price != null ? setup.entry_price : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500">Profit</p>
+              <p className={`font-mono text-xs sm:text-sm ${setup.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {setup.profit >= 0 ? `+${setup.profit.toFixed(2)}` : setup.profit.toFixed(2)}
+              </p>
+            </div>
+          </>
         )}
       </div>
 
@@ -151,6 +160,7 @@ export default function DashboardPage() {
   const [setups, setSetups] = useState<TradingSetup[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState<SortType>('symbol_asc');
   const [closedPage, setClosedPage] = useState(1);
   const [totalClosed, setTotalClosed] = useState(0);
   const [summary, setSummary] = useState<SetupListSummary | null>(null);
@@ -172,6 +182,7 @@ export default function DashboardPage() {
         const statusMap: Record<string, string> = { pending: 'pending', triggered: 'triggered', active: 'active', closed: 'closed,cancelled' };
         const params = new URLSearchParams({ status: statusMap[tab] || tab, page: String(closedPage), limit: String(PER_PAGE) });
         if (searchDebounced) params.set('search', searchDebounced);
+        if (tab !== 'closed') params.set('sort', sortBy);
         const data = await engineFetch(`/api/setups?${params}`);
         if (!active) return;
         if (data.success) {
@@ -186,7 +197,7 @@ export default function DashboardPage() {
       }
     })();
     return () => { active = false; };
-  }, [tab, closedPage, searchDebounced, reloadKey]);
+  }, [tab, closedPage, searchDebounced, sortBy, reloadKey]);
 
   const handleCancel = useCallback(async (id: number) => {
     const data = await engineFetch(`/api/setups/${id}`, { method: 'DELETE' });
@@ -253,10 +264,18 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="mb-4">
+      <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
         <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by symbol or memo..."
           className="w-full sm:max-w-md rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm text-white placeholder-slate-500 outline-none focus:border-blue-500" />
+        {tab !== 'closed' && (
+          <select value={sortBy} onChange={(e) => { setSortBy(e.target.value as SortType); setClosedPage(1); }}
+            aria-label="Sort by"
+            className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none focus:border-blue-500">
+            <option value="symbol_asc">Symbol A→Z</option>
+            <option value="symbol_desc">Symbol Z→A</option>
+          </select>
+        )}
       </div>
 
       {loading ? (

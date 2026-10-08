@@ -1,11 +1,4 @@
 #!/usr/bin/env node
-/**
- * Screener CandleProvider - Standalone service for real-time candle updates
- * 
- * This service runs independently from the TradingEngine and handles
- * real-time candle updates for all-assets screeners (SuperTrend, EW),
- * pending setups, and triggered setups.
- */
 
 const { getDatabaseManager } = require('./db');
 const CandleProvider = require('./services/candleProvider');
@@ -30,38 +23,17 @@ class ScreenerCandleProvider {
     this.httpServer = null;
   }
 
-  loadSymbols() {
-    const exchange = process.env.EXCHANGE || 'hyperliquid';
-    const configPath = path.resolve(Config.getProjectRoot(), `src/config/symbols/${exchange}.json`);
+  loadAssets() {
+    const configPath = path.resolve(Config.getProjectRoot(), 'src/config/symbols/assets.json');
     const raw = fs.readFileSync(configPath, 'utf8');
     const config = JSON.parse(raw);
-    return config.symbols.map(s => s.symbol);
-  }
-
-  loadTimeframes() {
-    const exchange = process.env.EXCHANGE || 'hyperliquid';
-    const configPath = path.resolve(Config.getProjectRoot(), `src/config/symbols/${exchange}.json`);
-    const raw = fs.readFileSync(configPath, 'utf8');
-    const config = JSON.parse(raw);
-    return config.intervals;
+    return { assets: config.assets, intervals: config.intervals };
   }
 
   async cleanupDatabase(exchange) {
     try {
       logger.info(`Preparing database for ${exchange} migration...`);
-      
-      // For production safety, we log but don't actually delete data
-      // In a real migration, you would:
-      // 1. Backup the database first
-      // 2. Run specific cleanup SQL
-      // 3. Validate the cleanup
-      
       logger.info(`Database preparation for ${exchange} completed (dry-run)`);
-      
-      // Example cleanup code (commented out for safety):
-      // await this.db.run('DELETE FROM screener_snapshot');
-      // await this.db.run('DELETE FROM price_alarms');
-      
     } catch (error) {
       logger.error('Database cleanup failed:', error);
       throw error;
@@ -71,60 +43,38 @@ class ScreenerCandleProvider {
   async start() {
     try {
       logger.info('Starting Screener CandleProvider service...');
-      
-      // Connect to database
+
       await this.db.connect();
       logger.info('Database connected');
-      
-      // Preload exchange services (warm-up cache)
+
       const ExchangeServiceManager = require('./services/exchangeServiceManager');
       await ExchangeServiceManager.initialize(this.db);
-      
-      const exchange = process.env.EXCHANGE || 'hyperliquid';
-      
-      // Database cleanup when switching exchanges
+
+      const exchange = process.env.EXCHANGE || 'bybit';
       await this.cleanupDatabase(exchange);
-      
-      // Initialize AllAssetsScreenerService dependencies
+
       AllAssetsScreenerService.setDeps(this.db, this.telegramService);
       AllAssetsScreenerService.setExchange(exchange);
-
-      // Initialize PendingSetupService dependencies
       PendingSetupService.setDeps(this.db, this.telegramService);
-      
-      // Initialize EntryService dependencies
       EntryService.setDeps(this.db, this.telegramService);
-
-      // Initialize PriceAlarmService dependencies
       PriceAlarmService.setDeps(this.db, this.telegramService);
-      
-      // Load ALL symbols and timeframes from config
-      const symbols = this.loadSymbols();
-      const timeframes = this.loadTimeframes();
-      
-      logger.info(`Loaded ${symbols.length} symbols and ${timeframes.length} timeframes from ${exchange} config`);
-      
-      // Create and start CandleProvider
+
+      const { assets, intervals } = this.loadAssets();
+      const timeframes = intervals;
+
+      logger.info(`Loaded ${assets.length} assets (${assets.filter(a => a.provider === 'bybit').length} bybit, ${assets.filter(a => a.provider === 'twelvedata').length} twelvedata) and ${timeframes.length} timeframes`);
+
       this.candleProvider = new CandleProvider({
-        exchange: exchange,
-        symbols,
+        assets,
         timeframes,
         limit: 1501,
-        onUpdate: (symbol, timeframe, candle) => {
-          // Optional: log candle updates
-          //logger.debug(`Candle closed for screener: ${symbol} ${timeframe}`);
-        },
+        onUpdate: (symbol, timeframe, candle) => {},
         onScreenerUpdate: async (symbol, timeframe, closedBars) => {
-          // Process all-assets screener (SuperTrend + EW + MA Z-Score)
-          // Skip for m1 to avoid excessive noise from 1-min candles
           if (timeframe !== 'm1') {
             AllAssetsScreenerService.processClosedCandle(symbol, timeframe, closedBars);
           }
-          // Process pending setups (must complete before processing entries)
           await PendingSetupService.processItemFromCandle(symbol, timeframe, closedBars);
-          // Process triggered setups (runs after pending setups complete)
           EntryService.processItemFromCandle(symbol, timeframe, closedBars);
-          // Process exit conditions for active setups matching this symbol+timeframe
           try {
             const activeSetups = await this.db.getActiveSetupsBySymbolTimeframe(symbol, timeframe);
             if (activeSetups && activeSetups.length > 0) {
@@ -148,33 +98,25 @@ class ScreenerCandleProvider {
           } catch (err) {
             logger.error(`Error processing exit conditions for ${symbol} ${timeframe}:`, err.message);
           }
-          // Process user price alarms
           PriceAlarmService.processClosedCandle(symbol, timeframe, closedBars).catch(err => {
             logger.error(`PriceAlarmService error for ${symbol} ${timeframe}:`, err.message);
           });
         },
         isTestnet: false
       });
-      
+
       await this.candleProvider.start();
       this.isRunning = true;
 
-      logger.info('✅ Screener CandleProvider service started successfully');
-      logger.info(`📊 Monitoring ALL ${symbols.length} symbols from config`);
-      logger.info(`⏱️  All timeframes: ${timeframes.join(', ')}`);
-      logger.info(`ℹ️  Populating initial screener snapshot...`);
+      logger.info('Screener CandleProvider service started successfully');
+      logger.info(`Monitoring ALL ${assets.length} assets from config`);
+      logger.info(`Timeframes: ${timeframes.join(', ')}`);
 
-      // Populate initial snapshot so UI has data immediately
-      // Wait for historical data to complete first (ensures enough bars)
       await this.candleProvider.waitForHistorical();
-      
-      // Initialize SuperTrend directions from historical data
+
       await AllAssetsScreenerService.populateInitialSnapshot(this.candleProvider);
-      
-      // Initialize MA Z-Score values from historical data
       await AllAssetsScreenerService.populateMAZScoreSnapshot(this.candleProvider);
 
-      // Start HTTP candle API server (buffer guaranteed populated after waitForHistorical)
       this.startCandleApiServer();
 
     } catch (error) {
@@ -184,7 +126,7 @@ class ScreenerCandleProvider {
     }
   }
 
-startCandleApiServer() {
+  startCandleApiServer() {
     const app = express();
     const port = process.env.CANDLE_API_PORT || 3004;
 
@@ -195,6 +137,29 @@ startCandleApiServer() {
       }
       const candles = this.candleProvider.getClosedCandles(symbol, timeframe);
       res.json(candles);
+    });
+
+    app.get('/quote/:symbol', (req, res) => {
+      const symbol = req.params.symbol;
+      const timeframe = req.query.timeframe || 'm1';
+      if (!symbol) {
+        return res.status(400).json({ error: 'Missing symbol' });
+      }
+      const candles = this.candleProvider.getClosedCandles(symbol, timeframe);
+      const latest = candles[candles.length - 1];
+      if (!latest) {
+        return res.json({ symbol, price: null, timestamp: null });
+      }
+      res.json({
+        symbol,
+        price: latest[4],
+        open: latest[1],
+        high: latest[2],
+        low: latest[3],
+        close: latest[4],
+        volume: latest[5],
+        timestamp: latest[0],
+      });
     });
 
     this.httpServer = app.listen(port, () => {
@@ -228,7 +193,7 @@ startCandleApiServer() {
         logger.error('Error stopping CandleProvider:', error);
       }
     }
-    
+
     try {
       const ExchangeServiceManager = require('./services/exchangeServiceManager');
       ExchangeServiceManager.clear();
@@ -237,25 +202,23 @@ startCandleApiServer() {
     } catch (error) {
       logger.error('Error disconnecting from database:', error);
     }
-    
+
     logger.info('Screener CandleProvider service stopped');
   }
 
   getStatus() {
     return {
       isRunning: this.isRunning,
-      symbols: this.candleProvider ? this.candleProvider.symbols : [],
+      assets: this.candleProvider ? this.candleProvider.assets : [],
       timeframes: this.candleProvider ? this.candleProvider.timeframes : [],
       storeSize: this.candleProvider ? this.candleProvider.store.size : 0
     };
   }
 }
 
-// CLI entry point
 if (require.main === module) {
   const app = new ScreenerCandleProvider();
-  
-  // Handle process signals
+
   const shutdown = async (signal) => {
     logger.info(`Received ${signal}, shutting down...`);
     try {
@@ -266,20 +229,19 @@ if (require.main === module) {
     await app.stop();
     process.exit(0);
   };
-  
+
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
-  
+
   process.on('uncaughtException', (error) => {
     logger.error('Uncaught exception:', error);
     app.stop().finally(() => process.exit(1));
   });
-  
+
   process.on('unhandledRejection', (reason, promise) => {
     logger.error('Unhandled promise rejection:', reason);
   });
-  
-  // Start the service
+
   app.start().catch((error) => {
     logger.error('Failed to start Screener CandleProvider:', error);
     process.exit(1);

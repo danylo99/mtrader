@@ -12,6 +12,15 @@ export interface SymbolsMap {
   };
 }
 
+export interface Asset {
+  id: string;
+  display: string;
+  symbol_ccxt: string;
+  symbol_hyperliquid: string;
+  provider: 'bybit' | 'twelvedata';
+  symbol_twelvedata?: string;
+}
+
 let cachedSymbols: SymbolsMap | null = null;
 
 async function getSymbolsMap(): Promise<SymbolsMap> {
@@ -29,4 +38,13 @@ export async function getSymbols(exchange: string): Promise<SymbolOption[]> {
 export async function getExchanges(): Promise<string[]> {
   const map = await getSymbolsMap();
   return Object.keys(map);
+}
+
+export async function getAssets(): Promise<Asset[]> {
+  const map = await getSymbolsMap();
+  return ((map['hyperliquid']?.symbols || []) as unknown) as Asset[];
+}
+
+export function assetFromSymbol(symbolCcxt: string, assets: Asset[]): Asset | undefined {
+  return assets.find(a => a.symbol_ccxt === symbolCcxt);
 }

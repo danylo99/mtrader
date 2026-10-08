@@ -5,6 +5,25 @@ const CandleUtils = require('../utils/candleUtils');
 const logger = require('../logger');
 
 class ActiveSetupService {
+  // Remaining open quantity = entry_qty minus every filled TP quantity.
+  // Shared by the BE path, SL hit accounting and the manual close flow so the
+  // size never drifts between them.
+  static getRemainingQty(setup, orders = []) {
+    const entryQty = Number(setup?.entry_qty) || 0;
+    const filledTpQty = (orders || [])
+      .filter(o => o.order_type.startsWith('tp') && o.status === 'filled')
+      .reduce((sum, o) => sum + (Number(o.qty) || 0), 0);
+    return Math.max(0, entryQty - filledTpQty);
+  }
+
+  // The SL order that is actually live on the exchange. An SL replace leaves a
+  // canceled row behind, and getOrdersBySetupId ranks all 'sl' rows equally, so
+  // a plain find() can hand back the stale one.
+  static findActiveSlOrder(orders = []) {
+    const slOrders = (orders || []).filter(o => o.order_type === 'sl');
+    return slOrders.find(o => o.status === 'pending') || slOrders.find(o => o.status === 'filled') || null;
+  }
+
   static async processActiveSetup(ctx, setup) {
     logger.info(`Processing active setup #${setup.id}`);
 
@@ -96,10 +115,7 @@ static async checkBreakEven(ctx, setup, exchangeService) {
       
 
       // FIX: Find active SL order (pending or filled)
-      const slOrder = orders.find(o => 
-        o.order_type === 'sl' && 
-        (o.status === 'pending' || o.status === 'filled')
-      );
+      const slOrder = this.findActiveSlOrder(orders);
       if (!slOrder) {
         logger.warn(`No active SL order found for setup #${setup.id}`);
         return;
@@ -187,7 +203,7 @@ static async checkBreakEven(ctx, setup, exchangeService) {
     try {
       const orders = await ctx.db.getOrdersBySetupId(setup.id);
 
-      const slOrder = orders.find(o => o.order_type === 'sl');
+      const slOrder = this.findActiveSlOrder(orders);
       if (slOrder && slOrder.status === 'pending') {
         const slHit = await this.checkSlCandleHit(ctx, setup, exchangeService, orders);
         if (slHit) {
@@ -240,7 +256,7 @@ static async checkBreakEven(ctx, setup, exchangeService) {
               const allTpOrders = orders.filter(o => o.order_type.startsWith('tp'));
               const allTpFilled = allTpOrders.length > 0 && allTpOrders.every(o => o.status === 'filled');
               if (allTpFilled) {
-                const currentSlOrder = orders.find(o => o.order_type === 'sl');
+                const currentSlOrder = this.findActiveSlOrder(orders);
                 if (currentSlOrder && currentSlOrder.status === 'pending' && currentSlOrder.exchange_order_id) {
                   try {
                     await exchangeService.cancelOrder(currentSlOrder.exchange_order_id, setup.symbol, { 'trigger': true });
@@ -268,7 +284,7 @@ static async checkBreakEven(ctx, setup, exchangeService) {
 
   static async checkSlCandleHit(ctx, setup, exchangeService, orders) {
     try {
-      const slOrder = orders.find(o => o.order_type === 'sl');
+      const slOrder = this.findActiveSlOrder(orders);
       if (!slOrder) return null;
 
       let candles = null;
@@ -312,9 +328,7 @@ static async checkBreakEven(ctx, setup, exchangeService) {
         }
       }
 
-      const filledTpOrders = orders.filter(o => o.order_type.startsWith('tp') && o.status === 'filled');
-      const filledQty = filledTpOrders.reduce((sum, o) => sum + (o.qty || 0), 0);
-      const remainingQty = (setup.entry_qty || 0) - filledQty;
+      const remainingQty = this.getRemainingQty(setup, orders);
       const qtyForPnl = remainingQty > 0 ? remainingQty : setup.entry_qty || 0;
 
       const pnl = PriceUtils.calculatePnl(setup.entry_price, slOrder.price, qtyForPnl, setup.side);
@@ -352,15 +366,15 @@ static async checkBreakEven(ctx, setup, exchangeService) {
     }
   }
 
-  static async closePosition(db, telegramService, setup, exchangeService, reason) {
+  static async closePosition(db, telegramService, setup, exchangeService, reason, options = {}) {
     try {
       const orders = await db.getOrdersBySetupId(setup.id);
-      
+
       // Calculate filled TP quantity
-      const filledTpOrders = orders.filter(o => o.order_type.startsWith('tp') && o.status === 'filled');
-      const filledQty = filledTpOrders.reduce((sum, o) => sum + (o.qty || 0), 0);
-      const remainingQty = (setup.entry_qty || 0) - filledQty;
-      
+      const remainingQty = this.getRemainingQty(setup, orders);
+
+      let closeQty = 0;
+      let closeOrder = null;
       // Place reduce-only market order for remaining quantity if any
       if (remainingQty > 0) {
         let closePrice = null;
@@ -372,8 +386,8 @@ static async checkBreakEven(ctx, setup, exchangeService) {
             logger.error(`Failed to fetch price for Hyperliquid close order: ${error.message}`);
           }
         }
-        
-        const closeOrder = {
+
+        const order = {
           symbol: setup.symbol,
           side: setup.side === 'long' ? 'Sell' : 'Buy',
           orderType: 'Market',
@@ -381,12 +395,13 @@ static async checkBreakEven(ctx, setup, exchangeService) {
           reduceOnly: true,
           timeInForce: 'IOC'
         };
-        
+
         if (closePrice !== null) {
-          closeOrder.price = closePrice;
+          order.price = closePrice;
         }
-        
-        await exchangeService.placeOrder(closeOrder);
+
+        closeOrder = await exchangeService.placeOrder(order);
+        closeQty = remainingQty;
         logger.info(`Placed reduce-only close order for setup #${setup.id}: ${remainingQty} qty${closePrice !== null ? ` at price ${closePrice}` : ''}`);
       } else {
         logger.info(`No remaining qty to close for setup #${setup.id} (already fully closed by TP orders)`);
@@ -417,10 +432,215 @@ static async checkBreakEven(ctx, setup, exchangeService) {
 
       await this.closeSetup(db, telegramService, setup, reason, pnl ? pnl.netPnl : 0);
       logger.info(`Position closed for setup #${setup.id}: ${reason}`);
+
+      // Manual closes need an order row so the trade log shows what happened;
+      // automated closes have no such row today. orders.price is NOT NULL, so
+      // fall back to the entry price if the ticker never came back.
+      if (options.recordCloseOrder) {
+        await db.createOrder({
+          setup_id: setup.id,
+          order_type: 'manual_close',
+          side: setup.side === 'long' ? 'sell' : 'buy',
+          price: currentPrice ?? setup.entry_price,
+          qty: closeQty,
+          exchange_order_id: closeOrder ? closeOrder.orderId : null,
+          status: 'filled'
+        });
+      }
+
+      return { closed: true, closedQty: closeQty, price: currentPrice };
     } catch (error) {
       logger.error(`Error closing position for setup #${setup.id}:`, error);
       throw error;
     }
+  }
+
+  // User-triggered close. requestedQty <= 0 (or omitted) closes the whole
+  // remaining position; anything else reduces it and leaves TP/SL untouched.
+  static async manualClosePosition(db, telegramService, setup, exchangeService, requestedQty) {
+    const orders = await db.getOrdersBySetupId(setup.id);
+    const remainingQty = this.getRemainingQty(setup, orders);
+
+    const parsedQty = Number(requestedQty);
+    if (!Number.isFinite(parsedQty) || parsedQty <= 0) {
+      return this.closePosition(db, telegramService, setup, exchangeService, 'manual_close', { recordCloseOrder: true });
+    }
+
+    const qty = exchangeService.roundAmount(setup.symbol, parsedQty);
+    if (!(qty > 0)) {
+      throw ActiveSetupService.badRequest(`Quantity ${parsedQty} is below the exchange minimum for ${setup.symbol}`);
+    }
+    if (qty > remainingQty + 1e-9) {
+      throw ActiveSetupService.badRequest(`Quantity ${qty} exceeds remaining position ${remainingQty}`);
+    }
+
+    const newEntryQty = remainingQty - qty;
+
+    let closePrice = null;
+    if (exchangeService.exchangeName === 'hyperliquid') {
+      try {
+        const ticker = await exchangeService.getTicker(setup.symbol);
+        closePrice = parseFloat(ticker.lastPrice);
+      } catch (error) {
+        logger.error(`Failed to fetch price for Hyperliquid close order: ${error.message}`);
+      }
+    }
+
+    const order = {
+      symbol: setup.symbol,
+      side: setup.side === 'long' ? 'Sell' : 'Buy',
+      orderType: 'Market',
+      qty: qty.toString(),
+      reduceOnly: true,
+      timeInForce: 'IOC'
+    };
+    if (closePrice !== null) {
+      order.price = closePrice;
+    }
+
+    const closeOrder = await exchangeService.placeOrder(order);
+    logger.info(`Manually closed ${qty} of setup #${setup.id} (${remainingQty} -> ${newEntryQty})`);
+
+    let currentPrice = closePrice;
+    if (currentPrice === null) {
+      try {
+        currentPrice = parseFloat((await exchangeService.getTicker(setup.symbol)).lastPrice);
+      } catch (error) {
+        logger.error(`Failed to fetch price for manual close of setup #${setup.id}: ${error.message}`);
+      }
+    }
+
+    let pnl = null;
+    if (setup.entry_price && currentPrice !== null) {
+      pnl = PriceUtils.calculatePnl(setup.entry_price, currentPrice, newEntryQty, setup.side);
+    }
+
+    await db.updateSetupStatus(setup.id, 'active', {
+      entry_qty: newEntryQty,
+      profit: pnl ? pnl.netPnl : undefined
+    });
+
+    await db.createOrder({
+      setup_id: setup.id,
+      order_type: 'manual_close',
+      side: setup.side === 'long' ? 'sell' : 'buy',
+      price: currentPrice ?? setup.entry_price,
+      qty: qty,
+      exchange_order_id: closeOrder ? closeOrder.orderId : null,
+      status: 'filled'
+    });
+
+    await telegramService.sendNotification(setup.user_id, 'manual_close', {
+      setupId: setup.id,
+      symbol: setup.symbol,
+      side: setup.side,
+      price: currentPrice,
+      quantity: qty,
+      remainingQty: newEntryQty,
+      pnl: pnl,
+      timestamp: new Date().toISOString()
+    });
+
+    return { closed: false, closedQty: qty, remainingQty: newEntryQty, price: currentPrice };
+  }
+
+  // Replace the live stop with a new price: place the new trigger first, then
+  // cancel the old one, so a placement failure leaves the position protected.
+  static async modifyStopLoss(db, telegramService, setup, exchangeService, newSlPrice) {
+    const price = Number(newSlPrice);
+    if (!Number.isFinite(price) || price <= 0) {
+      throw ActiveSetupService.badRequest('Stop loss price must be a positive number');
+    }
+
+    const ticker = await exchangeService.getTicker(setup.symbol);
+    const mark = parseFloat(ticker.lastPrice);
+    if (!Number.isFinite(mark) || mark <= 0) {
+      throw ActiveSetupService.badRequest(`Could not read a current market price for ${setup.symbol}`);
+    }
+
+    const slPrice = exchangeService.roundPrice(setup.symbol, price);
+    // Re-check after rounding: the exchange tick size can move the price onto
+    // or across the mark.
+    const isValidSide = setup.side === 'long' ? slPrice < mark : slPrice > mark;
+    if (!isValidSide) {
+      throw ActiveSetupService.badRequest(
+        setup.side === 'long'
+          ? `Stop loss must be below the current market price (${mark})`
+          : `Stop loss must be above the current market price (${mark})`
+      );
+    }
+
+    const orders = await db.getOrdersBySetupId(setup.id);
+    const remainingQty = this.getRemainingQty(setup, orders);
+    if (remainingQty <= 0) {
+      throw ActiveSetupService.badRequest('Position is already flat');
+    }
+
+    const slQty = exchangeService.roundAmount(setup.symbol, remainingQty);
+    if (!(slQty > 0)) {
+      throw ActiveSetupService.badRequest(`Remaining quantity is below the exchange minimum for ${setup.symbol}`);
+    }
+
+    const oldSlOrders = orders.filter(o => o.order_type === 'sl' && o.status === 'pending' && o.exchange_order_id);
+    if (oldSlOrders.length === 0) {
+      logger.warn(`No pending SL order found on the exchange for setup #${setup.id}; the new stop will be the only protection`);
+    }
+
+    const newOrder = await exchangeService.placeOrder({
+      symbol: setup.symbol,
+      side: setup.side === 'long' ? 'Sell' : 'Buy',
+      orderType: 'Market',
+      qty: slQty.toString(),
+      triggerPrice: slPrice,
+      triggerDirection: setup.side === 'long' ? 2 : 1,
+      reduceOnly: true,
+      timeInForce: 'GTC'
+    });
+
+    const warnings = [];
+    for (const oldSlOrder of oldSlOrders) {
+      try {
+        await exchangeService.cancelOrder(oldSlOrder.exchange_order_id, setup.symbol, { trigger: true });
+        await db.updateOrderStatus(oldSlOrder.id, 'canceled');
+      } catch (error) {
+        logger.error(`Failed to cancel old SL order ${oldSlOrder.exchange_order_id} for setup #${setup.id}:`, error);
+        warnings.push(oldSlOrder.exchange_order_id);
+      }
+    }
+
+    await db.createOrder({
+      setup_id: setup.id,
+      order_type: 'sl',
+      side: setup.side === 'long' ? 'sell' : 'buy',
+      price: slPrice,
+      qty: slQty,
+      exchange_order_id: newOrder ? newOrder.orderId : null,
+      status: 'pending'
+    });
+
+    // be_activated is intentionally left alone: the dashboard uses it to keep
+    // risk out of the open total once the stop sits at entry.
+    await db.updateSetupStatus(setup.id, 'active', { sl_price: slPrice });
+
+    await telegramService.sendNotification(setup.user_id, 'sl_modified', {
+      setupId: setup.id,
+      symbol: setup.symbol,
+      side: setup.side,
+      oldPrice: oldSlOrders[0] ? oldSlOrders[0].price : null,
+      newPrice: slPrice,
+      quantity: slQty,
+      timestamp: new Date().toISOString()
+    });
+
+    logger.info(`Stop loss for setup #${setup.id} moved to ${slPrice} (qty ${slQty})`);
+
+    return { slPrice, qty: slQty, warnings };
+  }
+
+  static badRequest(message) {
+    const error = new Error(message);
+    error.status = 400;
+    return error;
   }
 
   static async closeSetup(db, telegramService, setup, reason, profit = 0) {

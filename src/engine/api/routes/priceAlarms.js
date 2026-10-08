@@ -8,17 +8,26 @@ const auth = require('../middleware/auth');
 const TF_ORDER = ['m5', 'm15', 'h1', 'h4', 'd1', 'w1'];
 const VALID_DIRECTIONS = ['cross_above', 'cross_below'];
 
-function loadSymbols(exchange = 'bybit') {
+function loadAssets() {
   const candidates = [
-    path.resolve(__dirname, `../../../src/config/symbols/${exchange}.json`),
-    path.resolve(__dirname, `../../../../src/config/symbols/${exchange}.json`),
+    path.resolve(__dirname, '../../../src/config/symbols/assets.json'),
+    path.resolve(__dirname, '../../../../src/config/symbols/assets.json'),
   ];
   for (const p of candidates) {
     try {
       return JSON.parse(fs.readFileSync(p, 'utf8'));
     } catch {}
   }
-  return { symbols: [] };
+  return { assets: [] };
+}
+
+function loadSymbols(exchange = 'bybit') {
+  const config = loadAssets();
+  const symbols = config.assets || [];
+  if (exchange === 'bybit') {
+    return { symbols: symbols.filter(a => a.provider === 'bybit').map(a => ({ symbol: a.symbol_ccxt, display: a.display })) };
+  }
+  return { symbols: symbols.map(a => ({ symbol: a.symbol_ccxt, display: a.display })) };
 }
 
 function getExchangeFromRequest(req) {

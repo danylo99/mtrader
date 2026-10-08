@@ -133,13 +133,19 @@ async getSymbolInfo(symbol) {
     }
   }
   
+  static formatHyperliquidSymbol(symbol) {
+    return symbol.replace('/', '-');
+  }
+
   // Place an order
   async placeOrder(orderParams) {
     try {
       const symbol = orderParams.symbol;
-      const normalizedSymbol = this.exchangeName =='hyperliquid'?symbol:symbol.replace(':USDT', '').replace('/', '');
-      const exchangeSymbol = this.exchangeName =='hyperliquid'?symbol:symbol.replace(':USDT', '').replace('/', '');
-      
+      const exchangeSymbol = this.exchangeName === 'hyperliquid'
+        ? ExchangeService.formatHyperliquidSymbol(symbol)
+        : symbol.replace(':USDT', '').replace('/', '');
+      const normalizedSymbol = exchangeSymbol;
+
       // Convert order parameters to CCXT format
       const params = {
         symbol: exchangeSymbol,

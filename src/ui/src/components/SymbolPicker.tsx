@@ -2,34 +2,49 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Search, ChevronDown, X } from 'lucide-react';
-import { getSymbols } from '@/lib/symbols';
-import type { SymbolOption } from '@/lib/symbols';
+import { getSymbols, getAssets } from '@/lib/symbols';
+import type { SymbolOption, Asset } from '@/lib/symbols';
 
 interface SymbolPickerProps {
   value: string;
   onChange: (value: string) => void;
-  exchange: string;
+  exchange?: string;
+  assets?: Asset[];
   placeholder?: string;
   disabled?: boolean;
+  showDisplayOnly?: boolean;
 }
 
 export default function SymbolPicker({
   value,
   onChange,
-  exchange,
+  exchange = 'hyperliquid',
+  assets: assetsProp,
   placeholder = 'Select symbol...',
   disabled = false,
+  showDisplayOnly = false,
 }: SymbolPickerProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [highlighted, setHighlighted] = useState(0);
   const [options, setOptions] = useState<SymbolOption[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    getSymbols(exchange).then(setOptions);
-  }, [exchange]);
+    if (assetsProp) {
+      Promise.resolve().then(() => {
+        setOptions(assetsProp.map(a => ({ symbol: a.symbol_ccxt, display: a.display })));
+        setAssets(assetsProp);
+      });
+    } else if (exchange) {
+      Promise.all([getSymbols(exchange), getAssets()]).then(([sym, ast]) => {
+        setOptions(sym);
+        setAssets(ast);
+      });
+    }
+  }, [exchange, assetsProp]);
 
   const filtered = useMemo(
     () =>
@@ -41,6 +56,7 @@ export default function SymbolPicker({
   );
 
   const selected = options.find((o) => o.symbol === value);
+  const selectedAsset = assets.find(a => a.symbol_ccxt === value);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -84,7 +100,10 @@ export default function SymbolPicker({
         className="w-full rounded-lg border border-slate-600 bg-slate-700/50 px-4 py-2.5 text-left text-white outline-none focus:border-blue-500 flex items-center justify-between"
       >
         <span className={selected ? '' : 'text-slate-500'}>
-          {selected ? `${selected.symbol} (${selected.display})` : placeholder}
+          {showDisplayOnly
+            ? (selectedAsset?.display || placeholder)
+            : (selected ? `${selected.symbol} (${selected.display})` : placeholder)
+          }
         </span>
         <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" />
       </button>
@@ -116,28 +135,33 @@ export default function SymbolPicker({
             {filtered.length === 0 ? (
               <p className="px-3 py-2 text-sm text-slate-500">No symbols found</p>
             ) : (
-              filtered.map((o, i) => (
-                <button
-                  key={o.symbol}
-                  type="button"
-                  onClick={() => {
-                    onChange(o.symbol);
-                    setOpen(false);
-                    setQuery('');
-                  }}
-                  onMouseEnter={() => setHighlighted(i)}
-                  className={`w-full px-3 py-2 text-left text-sm flex justify-between items-center ${
-                    o.symbol === value
-                      ? 'bg-blue-600/20 text-blue-400'
-                      : i === highlighted
-                      ? 'bg-slate-700 text-white'
-                      : 'text-slate-300 hover:bg-slate-700'
-                  }`}
-                >
-                  <span>{o.symbol}</span>
-                  <span className="text-xs text-slate-500">{o.display}</span>
-                </button>
-              ))
+              filtered.map((o, i) => {
+                const asset = assets.find(a => a.symbol_ccxt === o.symbol);
+                return (
+                  <button
+                    key={o.symbol}
+                    type="button"
+                    onClick={() => {
+                      onChange(o.symbol);
+                      setOpen(false);
+                      setQuery('');
+                    }}
+                    onMouseEnter={() => setHighlighted(i)}
+                    className={`w-full px-3 py-2 text-left text-sm flex justify-between items-center ${
+                      o.symbol === value
+                        ? 'bg-blue-600/20 text-blue-400'
+                        : i === highlighted
+                        ? 'bg-slate-700 text-white'
+                        : 'text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <span>{showDisplayOnly ? o.display : o.symbol}</span>
+                    <span className="text-xs text-slate-500">
+                      {asset?.provider === 'twelvedata' ? 'TwelveData' : 'Bybit'}
+                    </span>
+                  </button>
+                );
+              })
             )}
           </div>
         </div>

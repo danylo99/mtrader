@@ -420,7 +420,8 @@ async runBeActivatedMigration() {
           WHEN 'tp3' THEN 4
           WHEN 'tp4' THEN 5
           WHEN 'sl' THEN 6
-          ELSE 7
+          WHEN 'manual_close' THEN 7
+          ELSE 8
         END
     `;
     
