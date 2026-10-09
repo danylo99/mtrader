@@ -159,14 +159,28 @@
       "id": "gold",
       "display": "GOLDUSDC.P",
       "symbol_ccxt": "XAU/USDT:USDT",
-      "symbol_hyperliquid": "XAU/USDC:USDC",
+      "symbol_hyperliquid": "XYZ-GOLD/USDC:USDC",
       "provider": "bybit"
     },
     {
       "id": "silver",
       "display": "SILVERUSDC.P",
       "symbol_ccxt": "XAG/USDT:USDT",
-      "symbol_hyperliquid": "XAG/USDC:USDC",
+      "symbol_hyperliquid": "XYZ-SILVER/USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "eurusd",
+      "display": "EURUSD.P",
+      "symbol_ccxt": "EURUSD/USDT:USDT",
+      "symbol_hyperliquid": "XYZ-EUR/USDC:USDC",
+      "provider": "bybit"
+    },
+    {
+      "id": "usdjpy",
+      "display": "USDJPY.P",
+      "symbol_ccxt": "USDJPY/USDT:USDT",
+      "symbol_hyperliquid": "XYJ-JPY/USDC:USDC",
       "provider": "bybit"
     }
   ]
