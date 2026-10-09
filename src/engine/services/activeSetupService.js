@@ -123,10 +123,11 @@ static async checkBreakEven(ctx, setup, exchangeService) {
       // FIX: Use float tolerance comparison
       if (Math.abs(slOrder.price - setup.entry_price) < 0.000001) {
         logger.info(`BE already active for setup #${setup.id} (SL at entry price)`);
-        // Also update be_activated flag for consistency
+        // Also update be_activated flag and sl_price for consistency
         if (!setup.be_activated) {
           await ctx.db.updateSetupStatus(setup.id, setup.status, { 
-            be_activated: 1 
+            be_activated: 1,
+            sl_price: setup.entry_price
           });
         }
         return;
@@ -190,7 +191,8 @@ static async checkBreakEven(ctx, setup, exchangeService) {
 
       // After successful BE activation
       await ctx.db.updateSetupStatus(setup.id, setup.status, { 
-        be_activated: 1 
+        be_activated: 1,
+        sl_price: setup.entry_price
       });
       
       logger.beActivated(setup.id);

@@ -181,4 +181,82 @@ router.put('/:id', auth, async (req, res) => {
   }
 });
 
+// Add a new TP limit order to an active setup
+router.post('/add-tp', auth, async (req, res) => {
+  try {
+    const { setup_id, price, qty } = req.body || {};
+    if (!setup_id || !price || !qty) {
+      return res.status(400).json({ error: 'setup_id, price, and qty are required' });
+    }
+
+    const setup = await db.getSetupById(setup_id);
+    if (!setup) return res.status(404).json({ error: 'Setup not found' });
+    if (setup.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+    if (setup.status !== 'active') return res.status(400).json({ error: 'Only active setups can have TP orders added' });
+
+    // Validate price is on correct side of entry
+    if (!setup.entry_price || setup.entry_price <= 0) {
+      return res.status(400).json({ error: 'Setup has no entry price yet' });
+    }
+    const isValidPrice = setup.side === 'long' ? price > setup.entry_price : price < setup.entry_price;
+    if (!isValidPrice) {
+      return res.status(400).json({ 
+        error: setup.side === 'long' 
+          ? 'TP price must be above entry price for long positions' 
+          : 'TP price must be below entry price for short positions'
+      });
+    }
+
+    // Check existing TP orders to find next available slot (tp1-tp4)
+    const orders = await db.getOrdersBySetupId(setup_id);
+    const existingTpNumbers = new Set();
+    for (const o of orders) {
+      const match = o.order_type.match(/^tp(\d+)$/);
+      if (match) existingTpNumbers.add(parseInt(match[1], 10));
+    }
+    let nextTpNumber = 1;
+    while (existingTpNumbers.has(nextTpNumber) && nextTpNumber <= 4) {
+      nextTpNumber++;
+    }
+    if (nextTpNumber > 4) {
+      return res.status(400).json({ error: 'Maximum of 4 TP orders allowed' });
+    }
+    const newOrderType = `tp${nextTpNumber}`;
+
+    // Validate and round price/qty
+    const exchangeService = await ExchangeServiceManager.getOrCreateFromSetup(setup);
+    const roundedPrice = exchangeService.roundPrice(setup.symbol, price);
+    const roundedQty = exchangeService.roundAmount(setup.symbol, qty);
+    if (!(roundedQty > 0)) {
+      return res.status(400).json({ error: 'Quantity is below exchange minimum' });
+    }
+
+    // Place limit order on exchange
+    const newOrder = await exchangeService.placeOrder({
+      symbol: setup.symbol,
+      side: setup.side === 'long' ? 'sell' : 'buy',
+      orderType: 'limit',
+      qty: roundedQty.toString(),
+      price: roundedPrice,
+      reduceOnly: true,
+      positionIdx: 0,
+    });
+
+    // Create order record in DB
+    const createdOrder = await db.createOrder({
+      setup_id: setup.id,
+      order_type: newOrderType,
+      side: setup.side === 'long' ? 'sell' : 'buy',
+      price: roundedPrice,
+      qty: roundedQty,
+      exchange_order_id: newOrder.orderId,
+      status: 'pending'
+    });
+
+    res.json({ success: true, data: createdOrder });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

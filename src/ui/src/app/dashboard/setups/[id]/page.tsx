@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Edit3, XCircle, Trash2, SlidersHorizontal, Pencil } from 'lucide-react';
+import { ArrowLeft, Edit3, XCircle, Trash2, SlidersHorizontal, Plus } from 'lucide-react';
 import engineFetch from '@/lib/api';
 import type { TradingSetup, Order } from '@/lib/types';
 import { TIMEFRAMES, INDICATORS, STATUS_STYLES, parseTpPrices } from '@/lib/constants';
@@ -50,6 +50,12 @@ export default function SetupDetailPage({ params }: { params: Promise<{ id: stri
   const [tpEditQty, setTpEditQty] = useState('');
   const [tpEditSubmitting, setTpEditSubmitting] = useState(false);
   const [tpEditError, setTpEditError] = useState('');
+
+  const [tpAddOpen, setTpAddOpen] = useState(false);
+  const [tpAddPrice, setTpAddPrice] = useState('');
+  const [tpAddQty, setTpAddQty] = useState('');
+  const [tpAddSubmitting, setTpAddSubmitting] = useState(false);
+  const [tpAddError, setTpAddError] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -213,6 +219,90 @@ export default function SetupDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
+  function calculateRisk(): { amount: number; label: string; isEstimated: boolean } | null {
+    if (!setup) return null;
+    
+    // Active trade: calculate from live position
+    if (setup.status === 'active' && setup.entry_price && setup.sl_price && setup.sl_price > 0) {
+      const remainingQty = setup.remaining_qty ?? setup.entry_qty ?? 0;
+      if (remainingQty <= 0) return { amount: 0, label: 'Risk', isEstimated: false };
+      const riskPerUnit = Math.abs(setup.entry_price - setup.sl_price);
+      const amount = riskPerUnit * remainingQty;
+      return { amount, label: 'Risk', isEstimated: false };
+    }
+    
+    // Pending/triggered: use configured risk
+    if ((setup.status === 'pending' || setup.status === 'triggered') && setup.risk_value > 0) {
+      if (setup.risk_type === 'fixed') {
+        return { amount: setup.risk_value, label: 'Risk (Fixed $)', isEstimated: false };
+      } else {
+        return { amount: setup.risk_value, label: 'Risk (%)', isEstimated: true };
+      }
+    }
+    
+    return null;
+  }
+
+  function getSuggestedTpPrice(): number | null {
+    if (!setup || !setup.entry_price || !setup.sl_price || setup.sl_price <= 0) return null;
+    const tpRatios = parseTpPrices(setup.tp_prices);
+    const existingTpNumbers = new Set();
+    for (const o of orders) {
+      const match = o.order_type.match(/^tp(\d+)$/);
+      if (match) existingTpNumbers.add(parseInt(match[1], 10));
+    }
+    let nextTpNumber = 1;
+    while (existingTpNumbers.has(nextTpNumber) && nextTpNumber <= 4) {
+      nextTpNumber++;
+    }
+    if (nextTpNumber > 4 || nextTpNumber > tpRatios.length) return null;
+    const rr = tpRatios[nextTpNumber - 1];
+    const riskPerUnit = Math.abs(setup.entry_price - setup.sl_price);
+    if (riskPerUnit === 0) return null;
+    const targetPrice = setup.side === 'long'
+      ? setup.entry_price + riskPerUnit * rr
+      : setup.entry_price - riskPerUnit * rr;
+    return targetPrice;
+  }
+
+  function openTpAddModal() {
+    const suggested = getSuggestedTpPrice();
+    setTpAddPrice(suggested ? String(suggested) : '');
+    setTpAddQty('');
+    setTpAddError('');
+    setTpAddOpen(true);
+  }
+
+  async function submitTpAdd() {
+    if (!setup) return;
+    const price = Number(tpAddPrice);
+    const qty = Number(tpAddQty);
+    if (!Number.isFinite(price) || price <= 0) {
+      setTpAddError('Price must be a positive number');
+      return;
+    }
+    if (!Number.isFinite(qty) || qty <= 0) {
+      setTpAddError('Quantity must be a positive number');
+      return;
+    }
+
+    setTpAddSubmitting(true);
+    setTpAddError('');
+    try {
+      await engineFetch(`/api/orders/add-tp`, {
+        method: 'POST',
+        body: JSON.stringify({ setup_id: setup.id, price, qty }),
+      });
+      setTpAddOpen(false);
+      await load();
+    } catch (err: unknown) {
+      const e = err as { error?: string; message?: string };
+      setTpAddError(e?.error || e?.message || 'Failed to add TP order');
+    } finally {
+      setTpAddSubmitting(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -284,6 +374,11 @@ export default function SetupDetailPage({ params }: { params: Promise<{ id: stri
                     <SlidersHorizontal className="h-4 w-4" />
                     Modify SL
                   </button>
+                  <button onClick={openTpAddModal}
+                    className="flex items-center gap-1.5 rounded-lg bg-slate-700 px-3 py-2 text-sm text-white hover:bg-slate-600">
+                    <Plus className="h-4 w-4" />
+                    Add TP
+                  </button>
                 </>
               )}
               <button onClick={handleCancel}
@@ -333,7 +428,15 @@ export default function SetupDetailPage({ params }: { params: Promise<{ id: stri
           <dl className="space-y-3">
             <div className="flex justify-between">
               <dt className="text-sm text-slate-500">Risk</dt>
-              <dd className="text-sm text-white">{setup.risk_type === 'percent' ? `${setup.risk_value}%` : `$${setup.risk_value}`}</dd>
+              <dd className="text-sm text-white">
+                {(() => {
+                  const risk = calculateRisk();
+                  if (!risk) return '—';
+                  if (risk.label === 'Risk (%)') return `${risk.amount}%`;
+                  const suffix = risk.isEstimated ? ' (est.)' : '';
+                  return `$${risk.amount.toFixed(2)}${suffix}`;
+                })()}
+              </dd>
             </div>
             <div className="flex justify-between items-center">
               <dt className="text-sm text-slate-500">Stop Loss</dt>
@@ -537,6 +640,40 @@ export default function SetupDetailPage({ params }: { params: Promise<{ id: stri
           {tpEditError && (
             <div className="mt-3 rounded-lg border border-red-900/50 bg-red-900/20 px-3 py-2 text-sm text-red-300">
               {tpEditError}
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {tpAddOpen && (
+        <Modal
+          open={tpAddOpen}
+          title="Add Take Profit"
+          onClose={() => !tpAddSubmitting && setTpAddOpen(false)}
+          footer={
+            <>
+              <button onClick={() => setTpAddOpen(false)} disabled={tpAddSubmitting}
+                className="rounded-lg bg-slate-700 px-3 py-2 text-sm text-white hover:bg-slate-600 disabled:opacity-50">
+                Cancel
+              </button>
+              <button onClick={submitTpAdd} disabled={tpAddSubmitting}
+                className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50">
+                {tpAddSubmitting ? 'Adding…' : 'Add'}
+              </button>
+            </>
+          }
+        >
+          <label className="mb-1 block text-sm text-slate-400">Price</label>
+          <input type="number" step="any" value={tpAddPrice}
+            onChange={e => setTpAddPrice(e.target.value)}
+            className={INPUT_CLASS} />
+          <label className="mt-3 mb-1 block text-sm text-slate-400">Quantity</label>
+          <input type="number" step="any" min="0" value={tpAddQty}
+            onChange={e => setTpAddQty(e.target.value)}
+            className={INPUT_CLASS} />
+          {tpAddError && (
+            <div className="mt-3 rounded-lg border border-red-900/50 bg-red-900/20 px-3 py-2 text-sm text-red-300">
+              {tpAddError}
             </div>
           )}
         </Modal>
