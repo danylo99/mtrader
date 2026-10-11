@@ -65,6 +65,7 @@ export interface TradingSetup {
 
 export interface SetupListSummary {
   totalFixedRisk: number;
+  totalLockedProfit: number;
   totalFloatingPnl: number;
   fixedCount: number;
   percentCount: number;

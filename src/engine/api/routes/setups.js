@@ -67,17 +67,42 @@ router.get('/', auth, async (req, res) => {
 
     // Totals over the full user-scoped status set, before the search filter,
     // so search affects neither total.
-    // BE-activated setups are risk-free: SL already moved to entry price.
-    // be_activated is only ever set for active setups, so this is a no-op on
-    // the pending/triggered tabs.
-    const counted = rows.filter(r => r.risk_type === 'fixed' && !Number(r.be_activated));
-    const totalFixedRisk = counted.reduce((sum, r) => sum + (Number(r.risk_value) || 0), 0);
+    // For active trades: calculate actual risk from live SL/entry/qty.
+    // For pending/triggered: use configured risk_value.
+    let totalFixedRisk = 0;
+    let totalLockedProfit = 0;
+    for (const r of rows) {
+      if (r.risk_type === 'fixed') {
+        if (r.status === 'active' && r.entry_price && r.sl_price && r.entry_qty) {
+          // Active trade: risk = (entry - sl) * qty for long, (sl - entry) * qty for short
+          // Positive = risk, Negative = locked profit
+          const entryPrice = Number(r.entry_price);
+          const slPrice = Number(r.sl_price);
+          const qty = Number(r.entry_qty) || 0;
+          let risk = 0;
+          if (r.side === 'long') {
+            risk = (entryPrice - slPrice) * qty;
+          } else {
+            risk = (slPrice - entryPrice) * qty;
+          }
+          if (risk > 0) {
+            totalFixedRisk += risk;
+          } else {
+            totalLockedProfit += Math.abs(risk);
+          }
+        } else {
+          // Pending/triggered: use configured risk (always risk, no locked profit yet)
+          totalFixedRisk += Number(r.risk_value) || 0;
+        }
+      }
+    }
     // Stored profit column; only meaningful on active setups (0 elsewhere).
     const totalFloatingPnl = rows.reduce((sum, r) => sum + (Number(r.profit) || 0), 0);
     const summary = {
       totalFixedRisk: Math.round(totalFixedRisk * 100) / 100,
+      totalLockedProfit: Math.round(totalLockedProfit * 100) / 100,
       totalFloatingPnl: Math.round(totalFloatingPnl * 100) / 100,
-      fixedCount: counted.length,
+      fixedCount: rows.filter(r => r.risk_type === 'fixed').length,
       percentCount: rows.filter(r => r.risk_type !== 'fixed').length,
       totalCount: rows.length,
     };

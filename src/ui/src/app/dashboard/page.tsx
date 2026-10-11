@@ -26,6 +26,26 @@ function SetupCardRaw({ setup, onCancel, onDelete }: {
   const tpArr = parseTpPrices(setup.tp_prices);
   const statusCfg = STATUS_CONFIG[setup.status] || STATUS_CONFIG.pending;
 
+  // Calculate risk and locked profit for active trades
+  const getRiskAndLockedProfit = () => {
+    if (setup.status !== 'active' || !setup.entry_price || !setup.sl_price || !setup.entry_qty) {
+      return { risk: 0, lockedProfit: 0 };
+    }
+    const entryPrice = Number(setup.entry_price);
+    const slPrice = Number(setup.sl_price);
+    const qty = Number(setup.entry_qty) || 0;
+    let risk = 0;
+    if (setup.side === 'long') {
+      risk = (entryPrice - slPrice) * qty;
+    } else {
+      risk = (slPrice - entryPrice) * qty;
+    }
+    if (risk > 0) return { risk, lockedProfit: 0 };
+    return { risk: 0, lockedProfit: Math.abs(risk) };
+  };
+
+  const { risk, lockedProfit } = getRiskAndLockedProfit();
+
   return (
     <div className={`rounded-xl border ${statusCfg.bg} p-4 sm:p-5 transition-colors hover:border-slate-600`}>
       <div className="flex items-start justify-between mb-3">
@@ -67,22 +87,34 @@ function SetupCardRaw({ setup, onCancel, onDelete }: {
           <p className="text-xs text-slate-500">TP Levels</p>
           <p className="text-white text-xs sm:text-sm">{tpArr.length > 0 ? `${tpArr.length}x RR: ${tpArr.join(':')}` : '—'}</p>
         </div>
-        {(setup.status === 'active' || setup.status === 'closed' || setup.status === 'cancelled') && (
-          <>
-            <div>
-              <p className="text-xs text-slate-500">Open Price</p>
-              <p className="font-mono text-white text-xs sm:text-sm">
-                {setup.entry_price != null ? setup.entry_price : '—'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500">Profit</p>
-              <p className={`font-mono text-xs sm:text-sm ${setup.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {setup.profit >= 0 ? `+${setup.profit.toFixed(2)}` : setup.profit.toFixed(2)}
-              </p>
-            </div>
-          </>
-        )}
+{(setup.status === 'active' || setup.status === 'closed' || setup.status === 'cancelled') && (
+            <>
+              <div>
+                <p className="text-xs text-slate-500">Open Price</p>
+                <p className="font-mono text-white text-xs sm:text-sm">
+                  {setup.entry_price != null ? setup.entry_price : '—'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Profit</p>
+                <p className={`font-mono text-xs sm:text-sm ${setup.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {setup.profit >= 0 ? `+${setup.profit.toFixed(2)}` : setup.profit.toFixed(2)}
+                </p>
+              </div>
+              {setup.status === 'active' && (
+                <>
+                  <div>
+                    <p className="text-xs text-slate-500">Risk</p>
+                    <p className="font-mono text-white text-xs sm:text-sm">${risk.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Locked Profit</p>
+                    <p className="font-mono text-emerald-400 text-xs sm:text-sm">${lockedProfit.toFixed(2)}</p>
+                  </div>
+                </>
+              )}
+            </>
+          )}
       </div>
 
       {(setup.status === 'pending' || setup.status === 'triggered' || setup.status === 'active') && (
@@ -236,9 +268,9 @@ export default function DashboardPage() {
 
       {tab !== 'closed' && (
         <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-4 mb-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <p className="text-xs text-slate-500">Total risk (fixed)</p>
+              <p className="text-xs text-slate-500">Total Risk (fixed)</p>
               <p className="font-mono text-lg sm:text-xl text-white">
                 {summary ? `$${summary.totalFixedRisk.toFixed(2)}` : '—'}
               </p>
@@ -250,16 +282,26 @@ export default function DashboardPage() {
               )}
             </div>
             {tab === 'active' && (
-              <div>
-                <p className="text-xs text-slate-500">Floating PnL</p>
-                <p className={`font-mono text-lg sm:text-xl ${summary && summary.totalFloatingPnl < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                  {summary
-                    ? `${summary.totalFloatingPnl >= 0 ? '+' : '-'}$${Math.abs(summary.totalFloatingPnl).toFixed(2)}`
-                    : '—'}
-                </p>
-                {summary && <p className="text-xs text-slate-500">{summary.totalCount} active position(s)</p>}
-              </div>
+              <>
+                <div>
+                  <p className="text-xs text-slate-500">Locked Profit</p>
+                  <p className="font-mono text-lg sm:text-xl text-emerald-400">
+                    {summary ? `$${summary.totalLockedProfit.toFixed(2)}` : '—'}
+                  </p>
+                  {summary && <p className="text-xs text-slate-500">SL in profit</p>}
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Floating PnL</p>
+                  <p className={`font-mono text-lg sm:text-xl ${summary && summary.totalFloatingPnl < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                    {summary
+                      ? `${summary.totalFloatingPnl >= 0 ? '+' : '-'}$${Math.abs(summary.totalFloatingPnl).toFixed(2)}`
+                      : '—'}
+                  </p>
+                  {summary && <p className="text-xs text-slate-500">{summary.totalCount} active position(s)</p>}
+                </div>
+              </>
             )}
+            {tab !== 'active' && <div />}
           </div>
         </div>
       )}
