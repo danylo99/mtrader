@@ -96,4 +96,8 @@ logger.dbError = (operation, error) => {
   logger.error(`Database error in ${operation}:`, error);
 };
 
+logger.setupClosed = (setupId, reason) => {
+  logger.info(`Setup closed: #${setupId} - ${reason}`);
+};
+
 module.exports = logger;

@@ -28,17 +28,17 @@ function SetupCardRaw({ setup, onCancel, onDelete }: {
 
   // Calculate risk and locked profit for active trades
   const getRiskAndLockedProfit = () => {
-    if (setup.status !== 'active' || !setup.entry_price || !setup.sl_price || !setup.entry_qty) {
+    if (setup.status !== 'active' || !setup.entry_price || !setup.sl_price) {
       return { risk: 0, lockedProfit: 0 };
     }
     const entryPrice = Number(setup.entry_price);
     const slPrice = Number(setup.sl_price);
-    const qty = Number(setup.entry_qty) || 0;
+    const qty = Math.max(0, Number(setup.remaining_qty ?? setup.entry_qty) || 0);
     let risk = 0;
-    if (setup.side === 'long') {
-      risk = (entryPrice - slPrice) * qty;
-    } else {
-      risk = (slPrice - entryPrice) * qty;
+    if (qty > 0) {
+      risk = setup.side === 'long'
+        ? (entryPrice - slPrice) * qty
+        : (slPrice - entryPrice) * qty;
     }
     if (risk > 0) return { risk, lockedProfit: 0 };
     return { risk: 0, lockedProfit: Math.abs(risk) };

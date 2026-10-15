@@ -69,26 +69,36 @@ router.get('/', auth, async (req, res) => {
     // so search affects neither total.
     // For active trades: calculate actual risk from live SL/entry/qty.
     // For pending/triggered: use configured risk_value.
+    for (const r of rows) {
+      const filledTpQty = Number(r.filled_tp_qty) || 0;
+      r.filled_tp_qty = filledTpQty;
+      if (r.status === 'active') {
+        r.remaining_qty = Math.max(0, (Number(r.entry_qty) || 0) - filledTpQty);
+      }
+    }
+
     let totalFixedRisk = 0;
     let totalLockedProfit = 0;
     for (const r of rows) {
       if (r.risk_type === 'fixed') {
-        if (r.status === 'active' && r.entry_price && r.sl_price && r.entry_qty) {
+        if (r.status === 'active' && r.entry_price && r.sl_price) {
           // Active trade: risk = (entry - sl) * qty for long, (sl - entry) * qty for short
           // Positive = risk, Negative = locked profit
           const entryPrice = Number(r.entry_price);
           const slPrice = Number(r.sl_price);
-          const qty = Number(r.entry_qty) || 0;
-          let risk = 0;
-          if (r.side === 'long') {
-            risk = (entryPrice - slPrice) * qty;
-          } else {
-            risk = (slPrice - entryPrice) * qty;
-          }
-          if (risk > 0) {
-            totalFixedRisk += risk;
-          } else {
-            totalLockedProfit += Math.abs(risk);
+          const qty = r.remaining_qty ?? (Number(r.entry_qty) || 0);
+          if (qty > 0) {
+            let risk = 0;
+            if (r.side === 'long') {
+              risk = (entryPrice - slPrice) * qty;
+            } else {
+              risk = (slPrice - entryPrice) * qty;
+            }
+            if (risk > 0) {
+              totalFixedRisk += risk;
+            } else {
+              totalLockedProfit += Math.abs(risk);
+            }
           }
         } else {
           // Pending/triggered: use configured risk (always risk, no locked profit yet)

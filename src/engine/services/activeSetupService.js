@@ -29,18 +29,17 @@ class ActiveSetupService {
 
     const exchangeService = await ctx.getExchangeService(setup.exchange_account_id, setup.exchange, setup.api_key_enc, setup.api_secret_enc, setup.is_testnet);
 
-    const positions = await exchangeService.getPositions(setup.symbol);
-    if (positions.length === 0 || positions.every(p => parseFloat(p.size) === 0)) {
-      logger.info(`Position not found for setup #${setup.id}. Marking as closed.`);
-      await this.closeSetup(ctx.db, ctx.telegramService, setup, 'Position not found');
-      return;
-    }
-
-
     await this.updateOrderStatuses(ctx, setup, exchangeService);
 
     const updatedSetup = await ctx.db.getSetupById(setup.id);
     if (!updatedSetup || updatedSetup.status !== 'active') {
+      return;
+    }
+
+    const positions = await exchangeService.getPositions(setup.symbol);
+    if (positions.length === 0 || positions.every(p => parseFloat(p.size) === 0)) {
+      logger.info(`Position not found for setup #${setup.id}. Marking as closed.`);
+      await this.closeSetup(ctx.db, ctx.telegramService, setup, 'Position not found');
       return;
     }
 
@@ -215,63 +214,30 @@ static async checkBreakEven(ctx, setup, exchangeService) {
       }
 
       for (const order of orders) {
-        if (order.status === 'pending' && order.exchange_order_id) {
-          const isPendingSl = order.order_type === 'sl';
-          if (isPendingSl) continue;
+        if (order.status !== 'pending') continue;
 
-          const status = await exchangeService.getOrderStatus(order.exchange_order_id, setup.symbol);
-          if (!status) {
-            logger.warn(`Order status not found for order ${order.id} (Exchange ID: ${order.exchange_order_id})`);
-            continue;
+        if (order.order_type.startsWith('tp')) {
+          // TP fills are detected by price/candle hit, not by exchange order
+          // status (see checkTpHitByPrice). No exchange_order_id required.
+          const tpHit = await this.checkTpHitByPrice(ctx, setup, exchangeService, order);
+          if (tpHit) {
+            await this.handleOrderFilled(ctx.db, ctx.telegramService, exchangeService, setup, order);
           }
-          if (status.status === 'closed' && status.amount == status.filled) {
-            await ctx.db.updateOrderStatus(order.id, 'filled');
+          continue;
+        }
 
-            await ctx.telegramService.sendNotification(setup.user_id, 'order_filled', {
-              setupId: setup.id,
-              symbol: setup.symbol,
-              orderType: order.order_type,
-              side: order.side,
-              price: order.price,
-              quantity: order.qty,
-              timestamp: new Date().toISOString()
-            });
+        // Non-TP pending orders: keep the existing exchange status check.
+        if (!order.exchange_order_id) continue;
 
-            logger.orderFilled(setup.id, order.order_type, order.price);
-
-            if (order.order_type.startsWith('tp')) {
-              const tpLevel = parseInt(order.order_type.replace('tp', ''));
-              const pnl = PriceUtils.calculatePnl(setup.entry_price, order.price, order.qty, setup.side);
-
-              await ctx.telegramService.sendNotification(setup.user_id, 'tp_hit', {
-                setupId: setup.id,
-                symbol: setup.symbol,
-                tpLevel: tpLevel,
-                price: order.price,
-                quantity: order.qty,
-                pnl: pnl,
-                timestamp: new Date().toISOString()
-              });
-
-              logger.tpHit(setup.id, tpLevel, order.price, pnl.netPnl);
-
-              const allTpOrders = orders.filter(o => o.order_type.startsWith('tp'));
-              const allTpFilled = allTpOrders.length > 0 && allTpOrders.every(o => o.status === 'filled');
-              if (allTpFilled) {
-                const currentSlOrder = this.findActiveSlOrder(orders);
-                if (currentSlOrder && currentSlOrder.status === 'pending' && currentSlOrder.exchange_order_id) {
-                  try {
-                    await exchangeService.cancelOrder(currentSlOrder.exchange_order_id, setup.symbol, { 'trigger': true });
-                    await ctx.db.updateOrderStatus(currentSlOrder.id, 'canceled');
-                  } catch (error) {
-                    logger.error(`Error cancelling SL order after all TP filled for setup #${setup.id}:`, error);
-                  }
-                }
-              }
-            }
-          } else if (status.status === 'canceled' || status.status === 'rejected') {
-            await ctx.db.updateOrderStatus(order.id, 'canceled');
-          }
+        const status = await exchangeService.getOrderStatus(order.exchange_order_id, setup.symbol);
+        if (!status) {
+          logger.warn(`Order status not found for order ${order.id} (Exchange ID: ${order.exchange_order_id})`);
+          continue;
+        }
+        if (status.status === 'closed' && status.amount == status.filled) {
+          await this.handleOrderFilled(ctx.db, ctx.telegramService, exchangeService, setup, order);
+        } else if (status.status === 'canceled' || status.status === 'rejected') {
+          await ctx.db.updateOrderStatus(order.id, 'canceled');
         }
       }
 
@@ -284,25 +250,67 @@ static async checkBreakEven(ctx, setup, exchangeService) {
     }
   }
 
+  // Shared fill handler for both the price-based TP path and the exchange
+  // status path. Marks the order filled, fires order_filled (+ tp_hit for TP
+  // orders), and cancels the SL once every TP level is filled.
+  static async handleOrderFilled(db, telegramService, exchangeService, setup, order) {
+    await db.updateOrderStatus(order.id, 'filled');
+
+    await telegramService.sendNotification(setup.user_id, 'order_filled', {
+      setupId: setup.id,
+      symbol: setup.symbol,
+      orderType: order.order_type,
+      side: order.side,
+      price: order.price,
+      quantity: order.qty,
+      timestamp: new Date().toISOString()
+    });
+
+    logger.orderFilled(setup.id, order.order_type, order.price);
+
+    if (order.order_type.startsWith('tp')) {
+      const tpLevel = parseInt(order.order_type.replace('tp', ''));
+      const pnl = PriceUtils.calculatePnl(setup.entry_price, order.price, order.qty, setup.side);
+
+      await telegramService.sendNotification(setup.user_id, 'tp_hit', {
+        setupId: setup.id,
+        symbol: setup.symbol,
+        tpLevel: tpLevel,
+        price: order.price,
+        quantity: order.qty,
+        pnl: pnl,
+        timestamp: new Date().toISOString()
+      });
+
+      logger.tpHit(setup.id, tpLevel, order.price, pnl.netPnl);
+
+      // Re-fetch orders so the allTpFilled check sees the TP we just marked
+      // filled — the in-memory `orders` array is stale at this point and would
+      // otherwise hide the final fill and never cancel the SL.
+      const freshOrders = await db.getOrdersBySetupId(setup.id);
+      const allTpOrders = freshOrders.filter(o => o.order_type.startsWith('tp'));
+      const allTpFilled = allTpOrders.length > 0 && allTpOrders.every(o => o.status === 'filled');
+      if (allTpFilled) {
+        const currentSlOrder = this.findActiveSlOrder(freshOrders);
+        if (currentSlOrder && currentSlOrder.status === 'pending' && currentSlOrder.exchange_order_id) {
+          try {
+            await exchangeService.cancelOrder(currentSlOrder.exchange_order_id, setup.symbol, { 'trigger': true });
+            await db.updateOrderStatus(currentSlOrder.id, 'canceled');
+          } catch (error) {
+            logger.error(`Error cancelling SL order after all TP filled for setup #${setup.id}:`, error);
+          }
+        }
+      }
+    }
+  }
+
   static async checkSlCandleHit(ctx, setup, exchangeService, orders) {
     try {
       const slOrder = this.findActiveSlOrder(orders);
       if (!slOrder) return null;
 
-      let candles = null;
-      const cpManager = ctx.getCandleProviderManager();
-      if (cpManager) {
-        candles = await cpManager.getClosedCandles(setup.exchange, setup.symbol, 'm5');
-      }
-      if (!candles) {
-        candles = await exchangeService.getCandles(setup.symbol, 'm5', 1500);
-      }
-      const parsedCandles = CandleUtils.parseExchangeCandles(candles);
-      const closedBars = CandleUtils.filterClosedBars(parsedCandles, 'm5');
-
-      if (closedBars.length === 0) return null;
-
-      const lastCandle = closedBars[closedBars.length - 1];
+      const lastCandle = await this._getLastClosedCandle(ctx, setup, exchangeService, 'm5');
+      if (!lastCandle) return null;
 
       if (setup.side === 'long' && lastCandle.low <= slOrder.price) {
         return lastCandle;
@@ -315,6 +323,41 @@ static async checkBreakEven(ctx, setup, exchangeService) {
     } catch (error) {
       logger.error(`Error checking SL candle hit for setup #${setup.id}:`, error);
       return null;
+    }
+  }
+
+  // Shared candle-fetch helper used by both the SL and TP price checks.
+  // Returns the last closed bar for the given timeframe, or null if none.
+  static async _getLastClosedCandle(ctx, setup, exchangeService, timeframe) {
+    let candles = null;
+    const cpManager = ctx.getCandleProviderManager();
+    if (cpManager) {
+      candles = await cpManager.getClosedCandles(setup.exchange, setup.symbol, timeframe);
+    }
+    if (!candles) {
+      candles = await exchangeService.getCandles(setup.symbol, timeframe, 1500);
+    }
+    const parsedCandles = CandleUtils.parseExchangeCandles(candles);
+    const closedBars = CandleUtils.filterClosedBars(parsedCandles, timeframe);
+    if (closedBars.length === 0) return null;
+    return closedBars[closedBars.length - 1];
+  }
+
+  // TP fills are detected by price/candle hit instead of exchange order
+  // status (see plan). Mirrors checkSlCandleHit but inverts the direction:
+  // long  -> high  >= tp price
+  // short -> low   <= tp price
+  static async checkTpHitByPrice(ctx, setup, exchangeService, tpOrder) {
+    try {
+      const lastCandle = await this._getLastClosedCandle(ctx, setup, exchangeService, 'm5');
+      if (!lastCandle) return false;
+
+      if (setup.side === 'long' && lastCandle.high >= Number(tpOrder.price)) return true;
+      if (setup.side === 'short' && lastCandle.low <= Number(tpOrder.price)) return true;
+      return false;
+    } catch (error) {
+      logger.error(`Error checking TP candle hit for setup #${setup.id}:`, error);
+      return false;
     }
   }
 
@@ -355,13 +398,19 @@ static async checkBreakEven(ctx, setup, exchangeService) {
   }
 
   static async updateSetupProfit(ctx, setup, exchangeService, currentPrice = null) {
-    if (!setup.entry_price || !setup.entry_qty) {
+    if (!setup.entry_price) {
       return;
     }
 
     try {
+      const orders = await ctx.db.getOrdersBySetupId(setup.id);
+      const remainingQty = this.getRemainingQty(setup, orders);
+      if (remainingQty <= 0) {
+        await ctx.db.updateSetupStatus(setup.id, setup.status, { profit: 0 });
+        return;
+      }
       const price = currentPrice !== null ? currentPrice : parseFloat((await exchangeService.getTicker(setup.symbol)).lastPrice);
-      const pnl = PriceUtils.calculatePnl(setup.entry_price, price, setup.entry_qty, setup.side);
+      const pnl = PriceUtils.calculatePnl(setup.entry_price, price, remainingQty, setup.side);
       await ctx.db.updateSetupStatus(setup.id, setup.status, { profit: pnl.netPnl });
     } catch (error) {
       logger.error(`Error updating profit for setup #${setup.id}:`, error);

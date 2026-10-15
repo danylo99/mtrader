@@ -243,9 +243,16 @@ async runBeActivatedMigration() {
   async getSetupsByStatus(statuses) {
     const placeholders = statuses.map(() => '?').join(',');
     const sql = `
-      SELECT ts.*, ea.exchange, ea.label as account_label, ea.api_key_enc, ea.api_secret_enc, ea.is_testnet
+      SELECT ts.*, ea.exchange, ea.label as account_label, ea.api_key_enc, ea.api_secret_enc, ea.is_testnet,
+             COALESCE(ft.qty, 0) AS filled_tp_qty
       FROM trading_setups ts
       JOIN exchange_accounts ea ON ts.exchange_account_id = ea.id
+      LEFT JOIN (
+        SELECT setup_id, SUM(qty) AS qty
+        FROM orders
+        WHERE status = 'filled' AND (order_type LIKE 'tp%')
+        GROUP BY setup_id
+      ) ft ON ft.setup_id = ts.id
       WHERE ts.status IN (${placeholders})
       ORDER BY ts.created_at DESC
     `;
