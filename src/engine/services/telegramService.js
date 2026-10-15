@@ -15,7 +15,8 @@ class TelegramService {
     'be_activated',
     'exit_triggered',
     'manual_close',
-    'sl_modified'
+    'sl_modified',
+    'setup_closed'
   ]);
 
   static SCREENER_MESSAGE_TYPES = new Set([
@@ -160,6 +161,9 @@ class TelegramService {
       case 'sl_modified':
         message += this.formatSlModified(payload);
         break;
+      case 'setup_closed':
+        message += this.formatSetupClosed(payload);
+        break;
       case 'error':
         message += this.formatError(payload);
         break;
@@ -212,6 +216,8 @@ class TelegramService {
         return this.formatManualClose(data);
       case 'sl_modified':
         return this.formatSlModified(data);
+      case 'setup_closed':
+        return this.formatSetupClosed(data);
       default:
         return this.formatCompactTradingMessage(
           ['NOTIFICATION', data.symbol, messageType],
@@ -236,6 +242,7 @@ class TelegramService {
         case 'exit_triggered':
         case 'manual_close':
         case 'sl_modified':
+        case 'setup_closed':
         case 'supply_demand_zone':
           if (data && data.setupId && data.symbol) {
             const side = data.side ? ` • ${data.side.toUpperCase()}` : '';
@@ -391,6 +398,20 @@ class TelegramService {
     );
   }
 
+  formatSetupClosed(data) {
+    const payload = data || {};
+    const reasonLabel = payload.reason === 'Position not found' ? 'POSITION NOT FOUND' : 'STOP LOSS HIT';
+    const pnlStr = payload.pnl && payload.pnl.netPnl !== undefined
+      ? ` · PnL: ${payload.pnl.netPnl >= 0 ? '+' : ''}${this.formatPrice(payload.pnl.netPnl)}`
+      : '';
+    return this.formatCompactTradingMessage(
+      ['CLOSED', payload.symbol, reasonLabel + pnlStr],
+      '⚠️',
+      payload.price,
+      payload.timestamp
+    );
+  }
+
   formatError(data) {
     const payload = data || {};
     return `❌ Error: ${payload.error || 'Unknown error'}
@@ -491,6 +512,7 @@ Price: ${this.formatPrice(price)}  ·  ${this.formatBatchTimestamp(timestamp)}
       'exit_triggered': '🚪',
       'manual_close': '✂️',
       'sl_modified': '🎚️',
+      'setup_closed': '⚠️',
       'screener_reversal': '🔔',
       'price_alarm': '🔔',
       'supply_demand_zone': '🏢',
@@ -513,6 +535,7 @@ Price: ${this.formatPrice(price)}  ·  ${this.formatBatchTimestamp(timestamp)}
       'exit_triggered': 'Exit Triggered',
       'manual_close': 'Manual Close',
       'sl_modified': 'Stop Loss Modified',
+      'setup_closed': 'Setup Closed',
       'screener_reversal': 'Screener Alert',
       'price_alarm': 'Price Alarm',
       'supply_demand_zone': 'Zone Alert',

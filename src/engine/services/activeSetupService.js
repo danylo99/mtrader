@@ -680,6 +680,40 @@ static async checkBreakEven(ctx, setup, exchangeService) {
 
         logger.exitTriggered(setup.id, reason);
       }
+
+      if (reason === 'Position not found' || reason === 'stop_loss_hit') {
+        let currentPrice = null;
+        let pnl = null;
+
+        if (reason === 'Position not found') {
+          const ExchangeServiceManager = require('./exchangeServiceManager');
+          const exchangeService = await ExchangeServiceManager.getOrCreate(
+            setup.exchange_account_id,
+            setup.exchange,
+            setup.api_key_enc,
+            setup.api_secret_enc,
+            setup.is_testnet
+          );
+          const ticker = await exchangeService.getTicker(setup.symbol);
+          currentPrice = parseFloat(ticker.lastPrice);
+          pnl = PriceUtils.calculatePnl(setup.entry_price, currentPrice, setup.entry_qty, setup.side);
+        } else {
+          currentPrice = setup.sl_price || setup.entry_price;
+          pnl = { netPnl: profit };
+        }
+
+        await telegramService.sendNotification(setup.user_id, 'setup_closed', {
+          setupId: setup.id,
+          symbol: setup.symbol,
+          side: setup.side,
+          price: currentPrice,
+          reason: reason,
+          pnl: pnl,
+          timestamp: new Date().toISOString()
+        });
+
+        logger.setupClosed(setup.id, reason);
+      }
     } catch (error) {
       logger.error(`Error closing setup #${setup.id}:`, error);
       throw error;

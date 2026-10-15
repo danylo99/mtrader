@@ -5,7 +5,7 @@ const fs = require('fs');
 const { getDatabaseManager } = require('../../db');
 const auth = require('../middleware/auth');
 
-const TF_ORDER = ['m5', 'm15', 'h1', 'h4', 'd1', 'w1'];
+const TF_ORDER = ['m1', 'm5', 'm15', 'h1', 'h4', 'd1', 'w1'];
 const VALID_DIRECTIONS = ['cross_above', 'cross_below'];
 
 function loadAssets() {

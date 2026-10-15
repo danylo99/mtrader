@@ -7,7 +7,7 @@ import type { PriceAlarm, Timeframe } from '@/lib/types';
 import SymbolPicker from '@/components/SymbolPicker';
 import { getSymbols } from '@/lib/symbols';
 
-const TF_ORDER: Timeframe[] = ['m5', 'm15', 'h1', 'h4', 'd1', 'w1'];
+const TF_ORDER: Timeframe[] = ['m1', 'm5', 'm15', 'h1', 'h4', 'd1', 'w1'];
 
 const emptyForm = {
   symbol: '',
