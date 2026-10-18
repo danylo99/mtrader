@@ -110,7 +110,13 @@ static async checkBreakEven(ctx, setup, exchangeService) {
       }
       
       const orders = await ctx.db.getOrdersBySetupId(setup.id);
-      const tp1Order = orders.find(o => o.order_type === 'tp1');
+      const tpOrders = orders
+        .filter(o => /^tp(\d+)$/.test(o.order_type))
+        .map(o => {
+          const match = o.order_type.match(/^tp(\d+)$/);
+          return { order: o, num: parseInt(match[1], 10) };
+        });
+      const tp1Order = tpOrders.reduce((min, cur) => cur.num < min.num ? cur : min, tpOrders[0])?.order;
       
 
       // FIX: Find active SL order (pending or filled)

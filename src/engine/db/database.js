@@ -143,8 +143,9 @@ class Database {
       await this.runBeActivatedMigration();
       // Run price level config migration
       await this.runPriceLevelConfigMigration();
+      // Run sl_type migration
+      await this.runSlTypeMigration();
     }
-
   }
 
   async runExchangeAccountsMigration() {
@@ -225,6 +226,16 @@ async runBeActivatedMigration() {
       await Migration.migrate(this);
     } catch (error) {
       logger.error('Price level config migration failed:', error);
+    }
+  }
+
+  async runSlTypeMigration() {
+    try {
+      const Migration = require('./migrate_sl_type');
+      const migration = new Migration(this);
+      await migration.runMigration();
+    } catch (error) {
+      logger.error('sl_type migration failed:', error);
     }
   }
 
@@ -437,15 +448,16 @@ async runBeActivatedMigration() {
       SELECT * FROM orders 
       WHERE setup_id = ? 
       ORDER BY 
-        CASE order_type 
-          WHEN 'entry' THEN 1
-          WHEN 'tp1' THEN 2
-          WHEN 'tp2' THEN 3
-          WHEN 'tp3' THEN 4
-          WHEN 'tp4' THEN 5
-          WHEN 'sl' THEN 6
-          WHEN 'manual_close' THEN 7
-          ELSE 8
+        CASE
+          WHEN order_type = 'entry' THEN 1
+          WHEN order_type LIKE 'tp%' THEN 2
+          WHEN order_type = 'sl' THEN 3
+          WHEN order_type = 'manual_close' THEN 4
+          ELSE 5
+        END,
+        CASE
+          WHEN order_type LIKE 'tp%' THEN CAST(SUBSTR(order_type, 3) AS INTEGER)
+          ELSE 0
         END
     `;
     

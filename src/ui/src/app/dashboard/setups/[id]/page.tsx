@@ -15,6 +15,13 @@ const ORDER_TYPE_LABELS: Record<string, string> = {
   manual_close: 'Manual Close',
 };
 
+function getOrderLabel(type: string): string {
+  if (ORDER_TYPE_LABELS[type]) return ORDER_TYPE_LABELS[type];
+  const match = type.match(/^tp(\d+)$/);
+  if (match) return `TP ${match[1]}`;
+  return type;
+}
+
 const INPUT_CLASS =
   'w-full rounded-lg border border-slate-600 bg-slate-700/50 px-4 py-2.5 text-white outline-none focus:border-blue-500';
 
@@ -252,10 +259,10 @@ export default function SetupDetailPage({ params }: { params: Promise<{ id: stri
       if (match) existingTpNumbers.add(parseInt(match[1], 10));
     }
     let nextTpNumber = 1;
-    while (existingTpNumbers.has(nextTpNumber) && nextTpNumber <= 4) {
+    while (existingTpNumbers.has(nextTpNumber)) {
       nextTpNumber++;
     }
-    if (nextTpNumber > 4 || nextTpNumber > tpRatios.length) return null;
+    if (nextTpNumber > tpRatios.length) return null;
     const rr = tpRatios[nextTpNumber - 1];
     const riskPerUnit = Math.abs(setup.entry_price - setup.sl_price);
     if (riskPerUnit === 0) return null;
@@ -506,7 +513,7 @@ export default function SetupDetailPage({ params }: { params: Promise<{ id: stri
               <tbody>
                 {orders.map((order) => (
                   <tr key={order.id} className="border-b border-slate-700/50">
-                    <td className="py-2.5 px-3 text-white">{ORDER_TYPE_LABELS[order.order_type] || order.order_type}</td>
+                    <td className="py-2.5 px-3 text-white">{getOrderLabel(order.order_type)}</td>
                     <td className={`py-2.5 px-3 font-medium ${order.side === 'buy' ? 'text-green-400' : 'text-red-400'}`}>
                       {order.side.toUpperCase()}
                     </td>
@@ -614,7 +621,7 @@ export default function SetupDetailPage({ params }: { params: Promise<{ id: stri
       {tpEditOrder && (
         <Modal
           open={!!tpEditOrder}
-          title={`Edit ${ORDER_TYPE_LABELS[tpEditOrder.order_type] || tpEditOrder.order_type}`}
+          title={`Edit ${getOrderLabel(tpEditOrder.order_type)}`}
           onClose={() => !tpEditSubmitting && setTpEditOrder(null)}
           footer={
             <>

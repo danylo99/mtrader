@@ -43,6 +43,8 @@ export default function EditSetupPage({ params }: { params: Promise<{ id: string
     risk_type: 'percent',
     risk_value: 0,
     sl_price: 0,
+    sl_type: undefined,
+    sl_percent: 2,
     tp_prices: [...DEFAULT_TP_RATIOS],
     be_enabled: false,
     be_trigger_price: 0,
@@ -80,6 +82,8 @@ export default function EditSetupPage({ params }: { params: Promise<{ id: string
             risk_type: s.risk_type,
             risk_value: s.risk_value,
             sl_price: s.sl_price || 0,
+            sl_type: s.sl_type || undefined,
+            sl_percent: s.sl_percent || 2,
             tp_prices: (() => { try { return JSON.parse(s.tp_prices); } catch { return DEFAULT_TP_RATIOS; } })(),
             be_enabled: !!s.be_enabled,
             be_trigger_price: s.be_trigger_price || 0,
@@ -114,6 +118,7 @@ export default function EditSetupPage({ params }: { params: Promise<{ id: string
     | 'entry_pricelevel_value'
     | 'risk_value'
     | 'sl_price'
+    | 'sl_percent'
     | 'be_trigger_price'
     | 'exit_pricelevel_value';
 
@@ -395,10 +400,49 @@ if (loading) {
                     className="w-full rounded-lg border border-slate-600 bg-slate-700/50 px-4 py-2.5 text-white outline-none focus:border-blue-500" required />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm text-slate-400">SL Price<span className="ml-1 text-xs text-slate-500">(0 for auto)</span></label>
-                  <input type="number" step="any" value={formData.sl_price}
-                    onChange={(e) => updateField('sl_price', Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-600 bg-slate-700/50 px-4 py-2.5 text-white outline-none focus:border-blue-500" />
+                  <label className="mb-1 block text-sm text-slate-400">Stop Loss</label>
+                  <div className="flex flex-col gap-1.5 mt-1">
+                    {(['auto', 'fixed', 'percent'] as const).map((mode) => (
+                      <label key={mode} className="flex items-center gap-2 cursor-pointer text-sm text-slate-300">
+                        <input type="radio" name="sl_mode"
+                          value={mode}
+                          checked={
+                            (mode === 'auto' && formData.sl_type === undefined) ||
+                            (mode !== 'auto' && formData.sl_type === mode)
+                          }
+                          onChange={() => updateField('sl_type', mode === 'auto' ? undefined : mode)}
+                          className="text-blue-600"
+                        />
+                        <span>{mode === 'auto' ? 'Auto (Swing)' : mode === 'fixed' ? 'Fixed' : '% of Entry'}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {formData.sl_type === 'fixed' && (
+                    <div className="mt-2">
+                      <label className="mb-1 block text-xs text-slate-400">SL Price</label>
+                      <input type="number" step="any" value={numVal('sl_price')}
+                        onChange={(e) => handleNum('sl_price', e.target.value)}
+                        className="w-full rounded-lg border border-slate-600 bg-slate-700/50 px-4 py-2.5 text-white outline-none focus:border-blue-500" />
+                    </div>
+                  )}
+                  {formData.sl_type === 'percent' && (
+                    <div className="mt-2">
+                      <label className="mb-1 block text-xs text-slate-400">SL %</label>
+                      <div className="flex items-center gap-2">
+                        <input type="number" step="0.1" min="0.1" max="99.9"
+                          value={numVal('sl_percent')}
+                          onChange={(e) => handleNum('sl_percent', e.target.value)}
+                          className="w-full rounded-lg border border-slate-600 bg-slate-700/50 px-4 py-2.5 text-white outline-none focus:border-blue-500" />
+                        <span className="text-sm text-slate-400">%</span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        SL = entry {formData.side === 'long' ? '−' : '+'} {formData.sl_percent || 2}%
+                      </p>
+                    </div>
+                  )}
+                  {formData.sl_type === undefined && (
+                    <p className="mt-1 text-xs text-slate-500">Detected from indicator swing or default fallback</p>
+                  )}
                 </div>
               </div>
             </div>

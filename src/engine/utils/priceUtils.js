@@ -104,6 +104,25 @@ class PriceUtils {
     }
   }
 
+  static resolveSLPrice({ entryPrice, side, slPrice, slType, slPercent,
+                          indicatorType = null, candles = null, indicatorParams = {} }) {
+    const type = String(slType || '').toLowerCase();
+    if (type === 'percent') {
+      const percent = slPercent > 0 ? slPercent : 2;          // default 2%
+      const factor = side === 'long' ? (1 - percent / 100) : (1 + percent / 100);
+      const sl = entryPrice * factor;
+      logger.info(`SL using percent mode: ${percent}% ${side === 'long' ? 'below' : 'above'} entry -> $${sl}`);
+      return sl;
+    }
+    if (slType && slPrice > 0) return slPrice;                // 'fixed' (explicit)
+    if (type === 'swing') {
+      return this.calculateSLPrice(entryPrice, 0, 0, side, indicatorType, candles, indicatorParams);
+    }
+    // Legacy / NULL sl_type: sl_price > 0 ? fixed : swing (current behavior)
+    if (slPrice > 0) return slPrice;
+    return this.calculateSLPrice(entryPrice, 0, 0, side, indicatorType, candles, indicatorParams);
+  }
+
   static calculateBreakEvenTriggerPrice(entryPrice, tp1Price) {
     // BE trigger is typically when price moves halfway to TP1
     const difference = Math.abs(tp1Price - entryPrice);

@@ -107,18 +107,16 @@ class EntryService {
 
       const indicatorParams = IndicatorService.getIndicatorParameters(setup.entry_indicator_type);
 
-      let slPrice = setup.sl_price > 0 ? setup.sl_price : null;
-      if (!slPrice) {
-        slPrice = PriceUtils.calculateSLPrice(
-          entryPrice,
-          0,
-          0,
-          setup.side,
-          setup.entry_indicator_type,
-          candles,
-          indicatorParams
-        );
-      }
+      const slPrice = PriceUtils.resolveSLPrice({
+        entryPrice,
+        side: setup.side,
+        slPrice: setup.sl_price,
+        slType: setup.sl_type,
+        slPercent: setup.sl_percent,
+        indicatorType: setup.entry_indicator_type,
+        candles,
+        indicatorParams
+      });
       
       const exchangeService = await this._getExchangeServiceForSetup(setup);
       const symbolInfo = await exchangeService.getSymbolInfo(setup.symbol);
@@ -447,7 +445,13 @@ class EntryService {
       const ticker = await exchangeService.getTicker(setup.symbol);
       const entryPrice = parseFloat(ticker.lastPrice);
 
-      const slPrice = exchangeService.roundPrice(setup.symbol, setup.sl_price);
+      const slPrice = exchangeService.roundPrice(setup.symbol, PriceUtils.resolveSLPrice({
+        entryPrice,
+        side: setup.side,
+        slPrice: setup.sl_price,
+        slType: setup.sl_type,
+        slPercent: setup.sl_percent
+      }));
       const symbolInfo = await exchangeService.getSymbolInfo(setup.symbol);
       const qtyStepSize = parseFloat(symbolInfo.qtyStep) || 0.001;
 
@@ -575,18 +579,16 @@ class EntryService {
 
       const indicatorParams = IndicatorService.getIndicatorParameters(setup.entry_indicator_type);
 
-      let slPrice = setup.sl_price > 0 ? setup.sl_price : null;
-      if (!slPrice) {
-        slPrice = PriceUtils.calculateSLPrice(
-          entryPrice,
-          0,
-          0,
-          setup.side,
-          setup.entry_indicator_type,
-          candles,
-          indicatorParams
-        );
-      }
+      const slPrice = PriceUtils.resolveSLPrice({
+        entryPrice,
+        side: setup.side,
+        slPrice: setup.sl_price,
+        slType: setup.sl_type,
+        slPercent: setup.sl_percent,
+        indicatorType: setup.entry_indicator_type,
+        candles,
+        indicatorParams
+      });
       const symbolInfo = await exchangeService.getSymbolInfo(setup.symbol);
       const qtyStepSize = parseFloat(symbolInfo.qtyStep) || 0.001;
 

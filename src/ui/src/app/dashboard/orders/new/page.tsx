@@ -24,6 +24,8 @@ export default function ManualOrderFormPage() {
     risk_type: 'fixed' as RiskType,
     risk_value: 0,
     sl_price: 0,
+    sl_type: 'fixed',
+    sl_percent: 2,
     tp_prices: [...DEFAULT_TP_RATIOS],
     be_enabled: false,
     be_trigger_price: 0,
@@ -62,7 +64,7 @@ export default function ManualOrderFormPage() {
     setFormData((prev) => ({ ...prev, [key]: value }));
   }
 
-  type NumericFormKey = 'exchange_account_id' | 'risk_value' | 'sl_price' | 'be_trigger_price';
+  type NumericFormKey = 'exchange_account_id' | 'risk_value' | 'sl_price' | 'sl_percent' | 'be_trigger_price';
 
   function handleNum(key: NumericFormKey, raw: string) {
     setRawNums((prev) => ({ ...prev, [key]: raw }));
@@ -124,16 +126,23 @@ export default function ManualOrderFormPage() {
     updateField('tp_prices', values);
   }
 
-  const slError = slTouched && formData.sl_price <= 0;
+  const slError = slTouched && formData.sl_type !== 'percent' && formData.sl_price <= 0;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
 
-    if (formData.sl_price <= 0) {
-      setSlTouched(true);
-      setError('Stop Loss is mandatory for manual orders');
-      return;
+    if (formData.sl_type === 'percent') {
+      if (!formData.sl_percent || formData.sl_percent <= 0 || formData.sl_percent >= 100) {
+        setError('SL percent must be between 0 and 100');
+        return;
+      }
+    } else {
+      if (formData.sl_price <= 0) {
+        setSlTouched(true);
+        setError('Stop Loss is mandatory for manual orders');
+        return;
+      }
     }
 
     if (formData.risk_value <= 0) {
@@ -153,6 +162,8 @@ export default function ManualOrderFormPage() {
       risk_type: formData.risk_type,
       risk_value: formData.risk_value,
       sl_price: formData.sl_price,
+      sl_type: formData.sl_type === 'fixed' ? undefined : formData.sl_type,
+      sl_percent: formData.sl_percent,
       tp_prices: formData.tp_prices,
       be_enabled: formData.be_enabled,
       be_trigger_price: formData.be_enabled ? formData.be_trigger_price : 0,
@@ -321,21 +332,50 @@ export default function ManualOrderFormPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-slate-400">
-                SL Price <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="number"
-                step="any"
-                value={numVal('sl_price')}
-                onChange={(e) => { handleNum('sl_price', e.target.value); setSlTouched(true); }}
-                className={`w-full rounded-lg border px-4 py-2.5 text-white outline-none focus:border-blue-500 ${
-                  slError ? 'border-red-500 bg-red-900/20' : 'border-slate-600 bg-slate-700/50'
-                }`}
-                required
-              />
-              {slError && (
-                <p className="mt-1 text-xs text-red-400">Stop Loss is mandatory for manual orders</p>
+              <label className="mb-1 block text-sm text-slate-400">Stop Loss</label>
+              <div className="flex flex-col gap-1.5 mt-1">
+                {(['fixed', 'percent'] as const).map((mode) => (
+                  <label key={mode} className="flex items-center gap-2 cursor-pointer text-sm text-slate-300">
+                    <input type="radio" name="sl_mode"
+                      value={mode}
+                      checked={formData.sl_type === mode}
+                      onChange={() => updateField('sl_type', mode)}
+                      className="text-blue-600"
+                    />
+                    <span>{mode === 'fixed' ? 'Fixed' : '% of Entry'}</span>
+                  </label>
+                ))}
+              </div>
+              {formData.sl_type === 'percent' && (
+                <div className="mt-2">
+                  <label className="mb-1 block text-xs text-slate-400">SL %</label>
+                  <div className="flex items-center gap-2">
+                    <input type="number" step="0.1" min="0.1" max="99.9"
+                      value={numVal('sl_percent')}
+                      onChange={(e) => handleNum('sl_percent', e.target.value)}
+                      className="w-full rounded-lg border border-slate-600 bg-slate-700/50 px-4 py-2.5 text-white outline-none focus:border-blue-500"
+                    />
+                    <span className="text-sm text-slate-400">%</span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    SL = entry {formData.side === 'long' ? '−' : '+'} {formData.sl_percent || 2}%
+                  </p>
+                </div>
+              )}
+              {formData.sl_type !== 'percent' && (
+                <div className="mt-2">
+                  <label className="mb-1 block text-xs text-slate-400">SL Price <span className="text-red-400">*</span></label>
+                  <input type="number" step="any"
+                    value={numVal('sl_price')}
+                    onChange={(e) => { handleNum('sl_price', e.target.value); setSlTouched(true); }}
+                    className={`w-full rounded-lg border px-4 py-2.5 text-white outline-none focus:border-blue-500 ${
+                      slError ? 'border-red-500 bg-red-900/20' : 'border-slate-600 bg-slate-700/50'
+                    }`}
+                  />
+                  {slError && (
+                    <p className="mt-1 text-xs text-red-400">Stop Loss is mandatory for manual orders</p>
+                  )}
+                </div>
               )}
             </div>
           </div>

@@ -30,6 +30,8 @@ export const setupSchema = z.object({
   risk_type: z.enum(['percent', 'fixed']),
   risk_value: z.number().positive('Must be positive'),
   sl_price: z.number().optional().default(0),
+  sl_type: z.enum(['fixed', 'swing', 'percent']).optional(),
+  sl_percent: z.number().optional().default(2),
   tp_prices: z.array(z.number()).min(0).max(8).default([1, 2, 3, 4]),
   be_enabled: z.boolean().default(false),
   be_trigger_price: z.number().optional().default(0),

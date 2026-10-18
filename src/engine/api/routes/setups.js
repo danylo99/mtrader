@@ -146,14 +146,28 @@ router.post('/', auth, async (req, res) => {
     const userId = req.user.id;
     const payload = req.body || {};
 
+    const slType = payload.sl_type || null;
+    let slPercent = payload.sl_percent;
+    if (slType === 'percent') {
+      if (slPercent !== undefined && slPercent !== null && slPercent !== '') {
+        const pct = Number(slPercent);
+        if (!Number.isFinite(pct) || pct <= 0 || pct >= 100) {
+          return res.status(400).json({ error: 'sl_percent must be a number between 0 and 100' });
+        }
+        slPercent = pct;
+      } else {
+        slPercent = 2;
+      }
+    }
+
     const sql = `INSERT INTO trading_setups (
       user_id, exchange_account_id, symbol, side, memo, activation_price, ignore_box_upper, ignore_box_lower,
       entry_indicator_type, entry_indicator_tf, entry_pricelevel_value,
-      risk_type, risk_value, sl_price, tp_prices,
+      risk_type, risk_value, sl_price, sl_type, sl_percent, tp_prices,
       be_enabled, be_trigger_price,
       exit_indicator_type, exit_indicator_tf, exit_pricelevel_value,
       status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`;
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`;
 
     const params = [
       userId,
@@ -170,6 +184,8 @@ router.post('/', auth, async (req, res) => {
       payload.risk_type || null,
       payload.risk_value || 0,
       payload.sl_price || 0,
+      slType,
+      slPercent,
       JSON.stringify(payload.tp_prices || []),
       payload.be_enabled ? 1 : 0,
       payload.be_trigger_price || 0,
@@ -213,7 +229,7 @@ router.put('/:id', auth, async (req, res) => {
     const updates = [];
     const params = [];
     Object.entries(req.body || {}).forEach(([k, v]) => {
-      if (['exchange_account_id','symbol','side','memo','activation_price','ignore_box_upper','ignore_box_lower','entry_indicator_type','entry_indicator_tf','entry_pricelevel_value','risk_type','risk_value','sl_price','tp_prices','be_enabled','be_trigger_price','exit_indicator_type','exit_indicator_tf','exit_pricelevel_value','status'].includes(k)) {
+      if (['exchange_account_id','symbol','side','memo','activation_price','ignore_box_upper','ignore_box_lower','entry_indicator_type','entry_indicator_tf','entry_pricelevel_value','risk_type','risk_value','sl_price','sl_type','sl_percent','tp_prices','be_enabled','be_trigger_price','exit_indicator_type','exit_indicator_tf','exit_pricelevel_value','status'].includes(k)) {
         updates.push(`${k} = ?`);
         params.push(k === 'tp_prices' ? JSON.stringify(v) : (k === 'entry_indicator_type' || k === 'exit_indicator_type') ? normalizeIndicatorType(v) : v);
       }

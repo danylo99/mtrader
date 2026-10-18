@@ -46,6 +46,8 @@ export interface TradingSetup {
   risk_type: RiskType;
   risk_value: number;
   sl_price: number;
+  sl_type?: string;
+  sl_percent?: number;
   tp_prices: string;
   be_enabled: number;
   be_trigger_price: number;
@@ -75,7 +77,7 @@ export interface SetupListSummary {
 export interface Order {
   id: number;
   setup_id: number;
-  order_type: OrderType;
+  order_type: string;
   side: OrderSide;
   price: number;
   qty: number;
@@ -99,6 +101,8 @@ export interface SetupFormData {
   risk_type: RiskType;
   risk_value: number;
   sl_price: number;
+  sl_type?: string;
+  sl_percent?: number;
   tp_prices: number[];
   be_enabled: boolean;
   be_trigger_price?: number;

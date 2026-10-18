@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS trading_setups (
   risk_type TEXT NOT NULL,
   risk_value REAL NOT NULL,
   sl_price REAL DEFAULT 0,
+  sl_type TEXT,
+  sl_percent REAL DEFAULT 2.0,
   tp_prices TEXT DEFAULT '[1,2,3,4]',
   be_enabled INTEGER DEFAULT 0,
   be_trigger_price REAL DEFAULT 0,

@@ -38,8 +38,25 @@ router.post('/place', auth, async (req, res) => {
     const userId = req.user.id;
     const payload = req.body || {};
 
-    if (!payload.sl_price || payload.sl_price <= 0) {
-      return res.status(400).json({ error: 'Stop Loss price is mandatory and must be greater than 0' });
+    const slType = payload.sl_type || null;
+    let slPercent = payload.sl_percent;
+
+    if (slType === 'percent') {
+      if (slPercent !== undefined && slPercent !== null && slPercent !== '') {
+        const pct = Number(slPercent);
+        if (!Number.isFinite(pct) || pct <= 0 || pct >= 100) {
+          return res.status(400).json({ error: 'sl_percent must be a number between 0 and 100' });
+        }
+        slPercent = pct;
+      } else {
+        slPercent = 2;
+      }
+    } else if (slType === 'swing') {
+      return res.status(400).json({ error: 'Manual orders cannot use swing stop loss (no indicator available)' });
+    } else {
+      if (!payload.sl_price || payload.sl_price <= 0) {
+        return res.status(400).json({ error: 'Stop Loss price is mandatory and must be greater than 0' });
+      }
     }
 
     if (!payload.risk_value || payload.risk_value <= 0) {
@@ -58,14 +75,14 @@ router.post('/place', auth, async (req, res) => {
       user_id, exchange_account_id, symbol, side, memo,
       activation_price, ignore_box_upper, ignore_box_lower,
       entry_indicator_type, entry_indicator_tf,
-      risk_type, risk_value, sl_price, tp_prices,
+      risk_type, risk_value, sl_price, sl_type, sl_percent, tp_prices,
       be_enabled, be_trigger_price,
       exit_indicator_type, exit_indicator_tf,
       status, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?,
       0, 0, 0,
       'manual', 'manual',
-      ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?,
       ?, ?,
       ?, ?,
       'triggered', datetime('now'), datetime('now'))`;
@@ -79,6 +96,8 @@ router.post('/place', auth, async (req, res) => {
       payload.risk_type || null,
       payload.risk_value || 0,
       payload.sl_price || 0,
+      slType,
+      slPercent,
       JSON.stringify(payload.tp_prices || []),
       payload.be_enabled ? 1 : 0,
       payload.be_trigger_price || 0,
@@ -207,7 +226,7 @@ router.post('/add-tp', auth, async (req, res) => {
       });
     }
 
-    // Check existing TP orders to find next available slot (tp1-tp4)
+    // Check existing TP orders to find next available slot
     const orders = await db.getOrdersBySetupId(setup_id);
     const existingTpNumbers = new Set();
     for (const o of orders) {
@@ -215,11 +234,8 @@ router.post('/add-tp', auth, async (req, res) => {
       if (match) existingTpNumbers.add(parseInt(match[1], 10));
     }
     let nextTpNumber = 1;
-    while (existingTpNumbers.has(nextTpNumber) && nextTpNumber <= 4) {
+    while (existingTpNumbers.has(nextTpNumber)) {
       nextTpNumber++;
-    }
-    if (nextTpNumber > 4) {
-      return res.status(400).json({ error: 'Maximum of 4 TP orders allowed' });
     }
     const newOrderType = `tp${nextTpNumber}`;
 
