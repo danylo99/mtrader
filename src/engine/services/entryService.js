@@ -107,7 +107,7 @@ class EntryService {
 
       const indicatorParams = IndicatorService.getIndicatorParameters(setup.entry_indicator_type);
 
-      const slPrice = PriceUtils.resolveSLPrice({
+      let slPrice = PriceUtils.resolveSLPrice({
         entryPrice,
         side: setup.side,
         slPrice: setup.sl_price,
@@ -579,7 +579,7 @@ class EntryService {
 
       const indicatorParams = IndicatorService.getIndicatorParameters(setup.entry_indicator_type);
 
-      const slPrice = PriceUtils.resolveSLPrice({
+      let slPrice = PriceUtils.resolveSLPrice({
         entryPrice,
         side: setup.side,
         slPrice: setup.sl_price,
