@@ -26,6 +26,8 @@ class IndicatorService {
           return SuperTrend.checkRollingSuperTrend(candles, params);
         case 'rollingsupertrend2':
           return SuperTrend.checkRollingSuperTrend2(candles, params);
+        case 'rollingsupertrend2stop':
+          return SuperTrend.checkRollingSuperTrend2(candles, params);
         case 'ewt':
           return EWT.checkEWT(candles, params);
         case 'macd':
@@ -64,6 +66,8 @@ class IndicatorService {
           return SuperTrend.getRollingSuperTrendSwingPrice(candles, side, params);
         case 'rollingsupertrend2':
           return SuperTrend.getRollingSuperTrend2SwingPrice(candles, side, params);
+        case 'rollingsupertrend2stop':
+          return SuperTrend.getRollingSuperTrend2SwingPrice(candles, side, params);
         case 'ewt':
           return EWT.getEWTSwingPrice(candles, side, params);
         case 'macd':
@@ -86,6 +90,7 @@ class IndicatorService {
       'supertrend': { period: 10, multiplier: 3 },
       'rollingsupertrend': { period: 10, multiplier: 3, rollingPeriod: 4 },
       'rollingsupertrend2': { period: 10, multiplier: 3, rollingPeriod: 16 },
+      'rollingsupertrend2stop': { period: 10, multiplier: 3, rollingPeriod: 16 },
       'macd': { fastPeriod: 12, slowPeriod: 26, signalPeriod: 9 },
       'ema': { fastPeriod: 9, slowPeriod: 21 },
       'ema_cross': { fastPeriod: 9, slowPeriod: 21 },
@@ -115,6 +120,13 @@ class IndicatorService {
 
   static getStopLossPrice(indicatorType, candles, side, entryPrice, params = {}) {
     const normalizedType = this._normalizeType(indicatorType);
+    if (normalizedType === 'rollingsupertrend2stop') {
+      return SuperTrend.getRollingSuperTrend2SwingPrice(candles, side, {
+        period: params.period || 10,
+        multiplier: params.multiplier || 3,
+        rollingPeriod: 16,
+      });
+    }
     if (normalizedType === 'rollingsupertrend2') {
       return SuperTrend.getRollingSuperTrendLineValue(candles, side, entryPrice, {
         period: params.period || 10,
@@ -126,7 +138,7 @@ class IndicatorService {
   }
 
   static validateIndicatorConfig(indicatorType, timeframe) {
-    const validIndicators = ['supertrend', 'rollingsupertrend', 'rollingsupertrend2', 'macd', 'ema', 'ewt', 'mazscore', 'pricelevel'];
+    const validIndicators = ['supertrend', 'rollingsupertrend', 'rollingsupertrend2', 'rollingsupertrend2stop', 'macd', 'ema', 'ewt', 'mazscore', 'pricelevel'];
     const validTimeframes = ['m1', 'm5', 'm15', 'm30', 'h1', 'h2', 'h4', 'd1', 'w1'];
 
     if (!validIndicators.includes(this._normalizeType(indicatorType))) {

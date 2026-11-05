@@ -508,6 +508,7 @@ export default function ManualOrderFormPage() {
                 <option value="supertrend">SuperTrend</option>
                 <option value="rollingsupertrend">Rolling SuperTrend</option>
                 <option value="rollingsupertrend2">Rolling SuperTrend2</option>
+                <option value="rollingsupertrend2stop">Rolling SuperTrend2Stop</option>
                 <option value="macd">MACD</option>
                 <option value="ema">EMA Cross</option>
                 <option value="ewt">EW Trading</option>
