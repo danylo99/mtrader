@@ -361,8 +361,8 @@ function checkEWT(candles, params = {}) {
       const breakStatus = breakDoneInLocalLeg ? 'broke' : 'not_broke';
       const breakTime = targetPeakValleyBar !== null ? lastIdx - targetPeakValleyBar : null;
       const formingBars = prevLegFormingTime !== null ? prevLegFormingTime : null;
-      const breakTiming = targetPeakValleyBar !== null && prevLegFormingTime !== null
-        ? ((lastIdx - targetPeakValleyBar) < prevLegFormingTime ? 'fast' : 'slow')
+      const breakTiming = breakDetectedTime !== null && formingBars !== null
+        ? (breakDetectedTime < formingBars ? 'fast' : 'slow')
         : 'n/a';
       const alignStatus = synthDir === localDir ? 'aligned' : 'not_aligned';
       const signalStatus = met ? 'triggered' : 'none';
