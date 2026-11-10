@@ -347,10 +347,8 @@ function checkEWT(candles, params = {}) {
       const msg = `symbol=${symbol} tf=${timeframe} currentPrice=${currentPrice} targetLevelToBreak=${targetLevelToBreak} priceVsTarget=${vsTarget} synthDir=${d.synthDir} localDir=${d.localDir} breakStatus=${d.breakStatus} breakTiming=${d.breakTiming} alignStatus=${d.alignStatus} signalStatus=${d.signalStatus} sl_price=${slPriceStr} prevExtremePrice=${prevExtStr}`;
       if (met) {
         logger.info(`EWT FAST BREAK (ENTRY): ${msg}`);
-        console.log(`EWT FAST BREAK (ENTRY): ${msg}`);
       } else {
         logger.info(`EWT CHECK (ENTRY): ${msg}`);
-        console.log(`EWT CHECK (ENTRY): ${msg}`);
       }
     }
 
@@ -363,7 +361,6 @@ function checkEWT(candles, params = {}) {
         ? (currentPrice > targetLevelToBreak ? 'above' : currentPrice < targetLevelToBreak ? 'below' : 'equal')
         : 'n/a';
       const msg = `symbol=${symbol} tf=${timeframe} breakTs=${breakDetectedTimestamp} currentPrice=${currentPrice} currentHigh=${currentHigh} currentLow=${currentLow} targetLevelToBreak=${targetLevelToBreak} priceVsTarget=${vsTarget} synthDir=${d.synthDir} localDir=${d.localDir} breakStatus=${d.breakStatus} breakDetectedTime=${d.breakDetectedTime} formingBars=${d.formingBars} breakTiming=${d.breakTiming} alignStatus=${d.alignStatus} signalStatus=${d.signalStatus} signalAlreadySignaled=${d.signalAlreadySignaled}`;
-      console.log(`EWT DEBUG: ${msg}`);
       logger.info(`EWT DEBUG: ${msg}`);
     }
 
