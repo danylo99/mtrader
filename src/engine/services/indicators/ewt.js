@@ -191,6 +191,8 @@ function checkEWT(candles, params = {}) {
             prevLegFormingTime = Math.max(1, curExtremeBar - prevExtremeBar);
           }
           breakDoneInLocalLeg = false;  // Reset break tracking for the new local ST leg
+          breakDetectedBar = null;
+          breakDetectedTime = null;
 
           legRefs.push({
             x1: activeLineX1,
