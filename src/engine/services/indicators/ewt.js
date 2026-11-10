@@ -195,7 +195,6 @@ function checkEWT(candles, params = {}) {
           breakDetectedBar = null;
           breakDetectedTime = null;
           breakDetectedTimestamp = null;
-          hasSignaledCurrentSynthDir = false;  // Reset signaled flag for new leg — one signal per leg per synth dir
 
           legRefs.push({
             x1: activeLineX1,
