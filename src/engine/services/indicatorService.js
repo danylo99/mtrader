@@ -68,8 +68,6 @@ class IndicatorService {
           return SuperTrend.getRollingSuperTrend2SwingPrice(candles, side, params);
         case 'rollingsupertrend2stop':
           return SuperTrend.getRollingSuperTrend2SwingPrice(candles, side, params);
-        case 'ewt':
-          return EWT.getEWTSwingPrice(candles, side, params);
         case 'macd':
           return MacdEma.getMACDSwingPrice(candles, side, params);
         case 'ema':
@@ -109,7 +107,7 @@ class IndicatorService {
         maxLegsAllowed: 5,
         useExtFilter: true,
         extMultiplier: 1.27,
-        tradeMode: 'First Change Only',
+        fastBreakMode: 'Continuous Entries',
       },
       'mazscore': { emaLength: 50, atrLength: 14, lookbackLength: 200 },
       'pricelevel': { priceLevel: 0 },
@@ -120,6 +118,13 @@ class IndicatorService {
 
   static getStopLossPrice(indicatorType, candles, side, entryPrice, params = {}) {
     const normalizedType = this._normalizeType(indicatorType);
+    if (normalizedType === 'ewt') {
+      const result = EWT.checkEWT(candles, params);
+      if (result.error) {
+        return { price: null, error: result.error };
+      }
+      return { price: result.sl_price, error: null };
+    }
     if (normalizedType === 'rollingsupertrend2stop') {
       return SuperTrend.getRollingSuperTrend2SwingPrice(candles, side, {
         period: params.period || 10,

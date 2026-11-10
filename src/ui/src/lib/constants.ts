@@ -17,7 +17,7 @@ export const INDICATORS = [
   { value: 'rollingsupertrend2stop', label: 'Rolling SuperTrend2Stop' },
   { value: 'macd', label: 'MACD' },
   { value: 'ema', label: 'EMA Cross' },
-  { value: 'ewt', label: 'EW Trading' },
+  { value: 'ewt', label: 'EW Fast Break' },
   { value: 'pricelevel', label: 'Price Level' },
 ] as const;
 

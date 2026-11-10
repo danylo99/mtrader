@@ -20,7 +20,8 @@ class TelegramService {
   ]);
 
   static SCREENER_MESSAGE_TYPES = new Set([
-    'screener_reversal'
+    'screener_reversal',
+    'screener_fast_break'
   ]);
 
   static ALARM_MESSAGE_TYPES = new Set([
@@ -113,6 +114,10 @@ class TelegramService {
 
     if (messageType === 'screener_reversal') {
       return this.formatScreenerReversal(payload);
+    }
+
+    if (messageType === 'screener_fast_break') {
+      return this.formatScreenerFastBreak(payload);
     }
 
     if (messageType === 'price_alarm') {
@@ -254,6 +259,8 @@ class TelegramService {
           return '';
         case 'screener_reversal':
           return data && data.symbol ? `${data.symbol}` : '';
+        case 'screener_fast_break':
+          return data && data.symbol ? `⚡ ${data.symbol}` : '';
         case 'error':
           return data && data.component ? `Component: ${data.component}` : '';
         default:
@@ -481,6 +488,21 @@ Price: ${this.formatPrice(price)}  ·  ${this.formatBatchTimestamp(timestamp)}
     );
   }
 
+  formatScreenerFastBreak(data) {
+    const payload = data || {};
+    const isBuy = payload.signal === 'fast_break_bullish';
+    const action = isBuy ? 'BUY' : 'SELL';
+    const emoji = isBuy ? '🟢' : '🟣';
+    const indicator = payload.indicatorType ? payload.indicatorType.toUpperCase() : '';
+
+    return this.formatCompactTradingMessage(
+      [`⚡ FAST BREAK ${action}`, payload.symbol, payload.timeframe, indicator],
+      emoji,
+      payload.price,
+      payload.timestamp
+    );
+  }
+
   formatPriceAlarm(data) {
     const payload = data || {};
     const directionLabel = payload.direction === 'cross_above' ? 'ABOVE' : 'BELOW';
@@ -514,6 +536,7 @@ Price: ${this.formatPrice(price)}  ·  ${this.formatBatchTimestamp(timestamp)}
       'sl_modified': '🎚️',
       'setup_closed': '⚠️',
       'screener_reversal': '🔔',
+      'screener_fast_break': '⚡',
       'price_alarm': '🔔',
       'supply_demand_zone': '🏢',
       'error': '⚠️'
@@ -537,6 +560,7 @@ Price: ${this.formatPrice(price)}  ·  ${this.formatBatchTimestamp(timestamp)}
       'sl_modified': 'Stop Loss Modified',
       'setup_closed': 'Setup Closed',
       'screener_reversal': 'Screener Alert',
+      'screener_fast_break': 'Fast Break Alert',
       'price_alarm': 'Price Alarm',
       'supply_demand_zone': 'Zone Alert',
       'error': 'Error Alert'

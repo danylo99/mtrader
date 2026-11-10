@@ -242,17 +242,35 @@ async createUser(email, passwordHash, timeoutMs) {
     return this.db.getScreenerSnapshots(indicatorType);
   }
 
-  async getEwSubscriptionsByUser(userId) {
-    return this.db.getEwSubscriptionsByUser(userId);
-  }
-
   async getEnabledEwSubscribers() {
     return this.db.getEnabledEwSubscribers();
   }
 
-  async replaceEwSubscriptionsForUser(userId, timeframes, timeoutMs) {
-    return this.runWriteOperation('replaceEwSubscriptionsForUser', async () => {
-      return this.db.replaceEwSubscriptionsForUser(userId, timeframes);
+  async getEwFastBreakSubscriptionsByUser(userId) {
+    return this.db.getEwFastBreakSubscriptionsByUser(userId);
+  }
+
+  async getEwFastBreakAssetSubscriptionsByUser(userId) {
+    return this.db.getEwFastBreakAssetSubscriptionsByUser(userId);
+  }
+
+  async getEnabledEwFastBreakSubscribers() {
+    return this.db.getEnabledEwFastBreakSubscribers();
+  }
+
+  async getEnabledEwFastBreakAssetSubscribers() {
+    return this.db.getEnabledEwFastBreakAssetSubscribers();
+  }
+
+  async replaceEwFastBreakSubscriptionsForUser(userId, timeframes, timeoutMs) {
+    return this.runWriteOperation('replaceEwFastBreakSubscriptionsForUser', async () => {
+      return this.db.replaceEwFastBreakSubscriptionsForUser(userId, timeframes);
+    }, timeoutMs);
+  }
+
+  async replaceEwFastBreakAssetSubscriptionsForUser(userId, symbols, timeoutMs) {
+    return this.runWriteOperation('replaceEwFastBreakAssetSubscriptionsForUser', async () => {
+      return this.db.replaceEwFastBreakAssetSubscriptionsForUser(userId, symbols);
     }, timeoutMs);
   }
 

@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, LayoutDashboard, LogOut, Settings, PlusCircle, ShoppingCart, Menu, X, ChevronDown, Search, Bell, List, MessageCircle } from 'lucide-react';
+import { Activity, LayoutDashboard, LogOut, Settings, PlusCircle, ShoppingCart, Menu, X, ChevronDown, Search, Bell, List, MessageCircle, Zap } from 'lucide-react';
 import engineFetch from '@/lib/api';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -64,7 +64,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/dashboard/screener-supertrend', label: 'RollingSuperTrend2', icon: Search },
-    { href: '/dashboard/screener-ew', label: 'EW Signal', icon: Search },
+    { href: '/dashboard/screener-ew-fast-break', label: 'EW Fast Break', icon: Zap },
     { href: '/dashboard/screener-mazscore', label: 'MA Z-Score', icon: Search },
     { href: '/dashboard/alarms', label: 'Price Alarms', icon: Bell },
     { href: '/dashboard/assets', label: 'Assets', icon: List },
@@ -187,12 +187,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Search className="h-4 w-4" />
             SuperTrend
           </Link>
-          <Link href="/dashboard/screener-ew"
+          <Link href="/dashboard/screener-ew-fast-break"
             className={`mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-              pathname.startsWith('/dashboard/screener-ew') ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'
+              pathname.startsWith('/dashboard/screener-ew-fast-break') ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'
             }`}>
-            <Search className="h-4 w-4" />
-            EW Signal
+            <Zap className="h-4 w-4" />
+            EW Fast Break
           </Link>
           <Link href="/dashboard/screener-mazscore"
             className={`mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${

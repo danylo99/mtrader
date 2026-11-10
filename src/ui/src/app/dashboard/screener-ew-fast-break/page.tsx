@@ -4,35 +4,44 @@ import { useEffect, useState, useCallback } from 'react';
 import { Bell, BellOff, Save } from 'lucide-react';
 import engineFetch from '@/lib/api';
 
-const TF_ORDER = ['m5', 'm15', 'h1', 'h4', 'd1', 'w1'];
+const TF_ORDER = ['m5', 'm15', 'm30', 'h1', 'h2', 'h4', 'd1', 'w1'];
 
 function SignalDot({ signal }: { signal: string | null }) {
   if (!signal) {
     return <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-700/50 text-slate-500 text-xs">—</span>;
   }
-  const isBullish = signal.startsWith('bullish');
+  const isBullish = signal === 'fast_break_bullish';
+  const isBearish = signal === 'fast_break_bearish';
   return (
     <span
-      className={`inline-flex items-center justify-center w-5 h-5 rounded-full ${isBullish ? 'bg-green-500' : 'bg-red-500'} shadow-sm`}
+      className={`inline-flex items-center justify-center w-5 h-5 rounded-full ${isBullish ? 'bg-green-500' : isBearish ? 'bg-purple-500' : 'bg-red-500'} shadow-sm`}
       title={signal}
     />
   );
 }
 
-export default function EWScreenerPage() {
+function SortIcon({ active, direction }: { active: boolean; direction: 'asc' | 'desc' | null }) {
+  if (!active) return <span className="text-slate-600 ml-1">⇅</span>;
+  return direction === 'asc' ? <span className="text-blue-400 ml-1">↑</span> : <span className="text-blue-400 ml-1">↓</span>;
+}
+
+export default function EWFastBreakScreenerPage() {
   const [data, setData] = useState<Record<string, Record<string, string | null>>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [subs, setSubs] = useState<Record<string, boolean>>({});
+  const [tfSubs, setTfSubs] = useState<Record<string, boolean>>({});
+  const [assetSubs, setAssetSubs] = useState<Record<string, boolean>>({});
   const [subsLoaded, setSubsLoaded] = useState(false);
   const [subsSaving, setSubsSaving] = useState(false);
   const [subsMessage, setSubsMessage] = useState<string | null>(null);
   const [telegramConfigured, setTelegramConfigured] = useState<boolean | null>(null);
+  const [sortBy, setSortBy] = useState<string>('symbol');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await engineFetch('/api/screener-status/ew');
+      const res = await engineFetch('/api/screener-status/ew-fast-break');
       if (!res.success) throw new Error(res.error || 'Failed to fetch');
       const rows: { symbol: string; timeframe: string; signal: string | null }[] = res.data || [];
       const matrix: Record<string, Record<string, string | null>> = {};
@@ -51,11 +60,14 @@ export default function EWScreenerPage() {
 
   const fetchSubs = useCallback(async () => {
     try {
-      const res = await engineFetch('/api/ew-subscriptions');
-      if (res.success && Array.isArray(res.data)) {
-        const map: Record<string, boolean> = {};
-        for (const row of res.data) map[row.timeframe] = !!row.enabled;
-        setSubs(map);
+      const res = await engineFetch('/api/ew-fast-break-subscriptions');
+      if (res.success) {
+        const tfMap: Record<string, boolean> = {};
+        for (const row of res.data.timeframes || []) tfMap[row.timeframe] = !!row.enabled;
+        const assetMap: Record<string, boolean> = {};
+        for (const row of res.data.symbols || []) assetMap[row.symbol] = !!row.enabled;
+        setTfSubs(tfMap);
+        setAssetSubs(assetMap);
       }
     } catch {}
     setSubsLoaded(true);
@@ -82,15 +94,13 @@ export default function EWScreenerPage() {
     setSubsSaving(true);
     setSubsMessage(null);
     try {
-      const timeframes = TF_ORDER.filter(tf => subs[tf]);
-      const res = await engineFetch('/api/ew-subscriptions', {
+      const timeframes = TF_ORDER.filter(tf => tfSubs[tf]);
+      const symbols = Object.keys(assetSubs).filter(s => assetSubs[s]);
+      const res = await engineFetch('/api/ew-fast-break-subscriptions', {
         method: 'PUT',
-        body: JSON.stringify({ timeframes }),
+        body: JSON.stringify({ timeframes, symbols }),
       });
       if (!res.success) throw new Error(res.error || 'Failed to save');
-      const map: Record<string, boolean> = {};
-      for (const row of res.data || []) map[row.timeframe] = !!row.enabled;
-      setSubs(map);
       setSubsMessage('Saved');
     } catch (err: unknown) {
       setSubsMessage(err instanceof Error ? err.message : 'Save failed');
@@ -99,13 +109,39 @@ export default function EWScreenerPage() {
     }
   }
 
-  const symbols = Object.keys(data).sort();
-  const anySubscribed = TF_ORDER.some(tf => subs[tf]);
+  const handleSort = (key: string) => {
+    if (sortBy === key) {
+      setSortDir(d => d === 'desc' ? 'asc' : 'desc');
+    } else {
+      setSortBy(key);
+      setSortDir(key === 'symbol' ? 'asc' : 'desc');
+    }
+  };
+
+  const sortSymbols = (a: string, b: string) => {
+    const aEnabled = !!assetSubs[a];
+    const bEnabled = !!assetSubs[b];
+    if (aEnabled !== bEnabled) return aEnabled ? -1 : 1;
+    if (sortBy === 'symbol') {
+      const cmp = a.localeCompare(b);
+      return sortDir === 'desc' ? -cmp : cmp;
+    }
+    const aVal = data[a]?.[sortBy];
+    const bVal = data[b]?.[sortBy];
+    if (aVal === null && bVal === null) return 0;
+    if (aVal === null) return 1;
+    if (bVal === null) return -1;
+    return sortDir === 'desc' ? (aVal < bVal ? 1 : -1) : (aVal < bVal ? -1 : 1);
+  };
+
+  const allSymbols = Object.keys(data);
+  const allSymbolsSorted = [...allSymbols].sort(sortSymbols);
+  const anySubscribed = TF_ORDER.some(tf => tfSubs[tf]) || Object.values(assetSubs).some(Boolean);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-slate-400 text-lg">Loading EW signals...</div>
+        <div className="text-slate-400 text-lg">Loading EW Fast Break signals...</div>
       </div>
     );
   }
@@ -122,7 +158,7 @@ export default function EWScreenerPage() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold text-white flex items-center gap-2">
-          EW Signal Screener
+          EW Fast Break Screener
           {anySubscribed ? (
             <Bell className="h-4 w-4 text-blue-400" aria-label="Telegram alerts enabled" />
           ) : (
@@ -144,53 +180,70 @@ export default function EWScreenerPage() {
       )}
 
       <div className="mb-4 rounded-xl border border-slate-700/50 bg-slate-800 p-4">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center justify-between gap-4 flex-wrap mb-3">
           <div>
             <div className="text-sm font-medium text-white">Telegram alerts per timeframe</div>
-            <div className="text-xs text-slate-400">Get notified on every EW reversal for the selected timeframes.</div>
+            <div className="text-xs text-slate-400">Get notified on every EW Fast Break signal for the selected timeframes and assets.</div>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             {TF_ORDER.map(tf => (
               <label key={tf} className="flex items-center gap-1.5 text-sm text-slate-300 select-none">
                 <input
                   type="checkbox"
-                  checked={!!subs[tf]}
-                  onChange={(e) => setSubs({ ...subs, [tf]: e.target.checked })}
+                  checked={!!tfSubs[tf]}
+                  onChange={(e) => setTfSubs({ ...tfSubs, [tf]: e.target.checked })}
                   className="rounded border-slate-600"
                   disabled={!subsLoaded}
                 />
                 <span className="uppercase font-mono text-xs">{tf}</span>
               </label>
             ))}
-            <button
-              onClick={saveSubs}
-              disabled={subsSaving || !subsLoaded}
-              className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              <Save className="h-4 w-4" />
-              {subsSaving ? 'Saving…' : 'Save'}
-            </button>
           </div>
         </div>
-        {subsMessage && (
-          <div className={`mt-2 text-xs ${subsMessage === 'Saved' ? 'text-green-400' : 'text-red-400'}`}>
-            {subsMessage}
-          </div>
-        )}
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={saveSubs}
+            disabled={subsSaving || !subsLoaded}
+            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            <Save className="h-4 w-4" />
+            {subsSaving ? 'Saving…' : 'Save'}
+          </button>
+          {subsMessage && (
+            <div className={`text-xs ${subsMessage === 'Saved' ? 'text-green-400' : 'text-red-400'}`}>
+              {subsMessage}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm text-left">
           <thead>
             <tr className="border-b border-slate-700/50">
-              <th className="sticky left-0 bg-slate-900 z-10 px-3 py-2 text-slate-400 font-medium">Symbol</th>
+              <th
+                onClick={() => handleSort('symbol')}
+                className={`sticky left-0 bg-slate-900 z-10 px-3 py-2 font-medium cursor-pointer select-none hover:text-white transition-colors ${sortBy === 'symbol' ? 'text-white' : 'text-slate-400'}`}
+              >
+                Symbol
+                <SortIcon active={sortBy === 'symbol'} direction={sortDir} />
+              </th>
               {TF_ORDER.map((tf) => (
-                <th key={tf} className="px-3 py-2 text-slate-400 font-medium text-center uppercase">{tf}</th>
+                <th
+                  key={tf}
+                  onClick={() => handleSort(tf)}
+                  className={`px-3 py-2 text-slate-400 font-medium text-center uppercase cursor-pointer select-none hover:text-white transition-colors ${sortBy === tf ? 'text-white' : ''}`}
+                >
+                  {tf}
+                  <SortIcon active={sortBy === tf} direction={sortDir} />
+                </th>
               ))}
+              <th className="sticky right-0 bg-slate-900 z-10 px-3 py-2 text-slate-400 font-medium text-center">Alert</th>
             </tr>
           </thead>
           <tbody>
-            {symbols.map((symbol) => {
+            {allSymbolsSorted.map((symbol) => {
               const display = symbol.replace('/USDT:USDT', '');
               return (
                 <tr key={symbol} className="border-b border-slate-800/50 hover:bg-slate-800/30">
@@ -200,6 +253,18 @@ export default function EWScreenerPage() {
                       <SignalDot signal={data[symbol]?.[tf] ?? null} />
                     </td>
                   ))}
+                  <td className="sticky right-0 bg-slate-900 z-10 px-3 py-2 text-center">
+                    <label className="flex items-center justify-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!assetSubs[symbol]}
+                        onChange={(e) => setAssetSubs({ ...assetSubs, [symbol]: e.target.checked })}
+                        disabled={!subsLoaded}
+                        className="h-4 w-4 rounded border-slate-600"
+                        title={`Alert for ${display}`}
+                      />
+                    </label>
+                  </td>
                 </tr>
               );
             })}

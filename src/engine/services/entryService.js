@@ -105,7 +105,7 @@ class EntryService {
       const lastCandle = candles[candles.length - 1];
       const entryPrice = lastCandle.close;
 
-      const indicatorParams = IndicatorService.getIndicatorParameters(setup.entry_indicator_type);
+      const indicatorParams = { ...IndicatorService.getIndicatorParameters(setup.entry_indicator_type), symbol: setup.symbol, timeframe: setup.entry_indicator_tf };
 
       const slPrice = PriceUtils.resolveSLPrice({
         entryPrice,
@@ -577,7 +577,7 @@ class EntryService {
       const lastCandle = candles[candles.length - 1];
       const entryPrice = lastCandle.close;
 
-      const indicatorParams = IndicatorService.getIndicatorParameters(setup.entry_indicator_type);
+      const indicatorParams = { ...IndicatorService.getIndicatorParameters(setup.entry_indicator_type), symbol: setup.symbol, timeframe: setup.entry_indicator_tf };
 
       const slPrice = PriceUtils.resolveSLPrice({
         entryPrice,

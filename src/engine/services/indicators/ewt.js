@@ -9,6 +9,8 @@ const {
 function checkEWT(candles, params = {}) {
   try {
     const {
+      symbol = 'unknown',
+      timeframe = 'unknown',
       barsPerHour = 4,
       barsPerHour2 = 16,
       macroAtrLen = 10,
@@ -17,13 +19,13 @@ function checkEWT(candles, params = {}) {
       localMult = 3.0,
       zscoreLength = 500,
       zscoreMin = 1.8,
-      zscoreMax = 15.0,
+      zscoreMax = 10.0,
       useWickFilter = true,
       maxWickRatio = 0.3,
       maxLegsAllowed = 5,
       useExtFilter = true,
       extMultiplier = 1.27,
-      tradeMode = 'First Change Only',
+      fastBreakMode = 'Continuous Entries',
     } = params;
 
     const minRequired = Math.max(zscoreLength, barsPerHour + macroAtrLen, localAtrLen + 2);
@@ -143,52 +145,30 @@ function checkEWT(candles, params = {}) {
     const { superTrend: localSTArr, direction: localDirArr } =
       _calculateSuperTrendAligned(highs, lows, closes, localAtrLen, localMult);
 
-    // ── Step D: Leg Tracking + Signal Generation ─────────────────────────
+    // ── Step D: Leg Tracking + Fast Break Signal ─────────────────────────
     const legRefs = [];
     let prevExtremePrice = null, curExtremePrice = null;
     let prevLocalDir = 0, localDir = 0, localStLine = null;
     let activeLineX1 = null;
     let activeIsBull = true;
 
-    let first_leg_ext_target = null;
-    let targetHtfStartBar = null;
-    let htfLongTaken = false, htfShortTaken = false;
+    // ── Fast Break tracking ──
+    let targetLevelToBreak = null;
+    let targetPeakValleyBar = null;
+    let prevLegFormingTime = null;
+    let breakDoneInLocalLeg = false;
+    let hasSignaledCurrentSynthDir = false;
+    let curExtremeBar = null;
+    let prevExtremeBar = null;
+    let fastBreakBullTrigger = false;
+    let fastBreakBearTrigger = false;
 
     for (let i = 0; i < length; i++) {
       const h = highs[i], l = lows[i], c = closes[i];
 
-      // ── HTF change: reset flags, compute extension target ──
+      // ── HTF change: reset signaled flag only ──
       if (htfChangedArr[i]) {
-        htfLongTaken = false;
-        htfShortTaken = false;
-        first_leg_ext_target = null;
-        targetHtfStartBar = i;
-
-        const extRatio = extMultiplier - 1.0;
-        const newSynthBullish = synthDirArr[i] === -1;
-        let foundLeg = false;
-        for (let li = 0; li < legRefs.length && !foundLeg; li++) {
-          const leg = legRefs[li];
-          if (leg.x1 >= targetHtfStartBar) {
-            const legLen = Math.abs(leg.y2 - leg.y1);
-            if (newSynthBullish) {
-              first_leg_ext_target = Math.max(leg.y1, leg.y2) + (legLen * extRatio);
-            } else {
-              first_leg_ext_target = Math.min(leg.y1, leg.y2) - (legLen * extRatio);
-            }
-            foundLeg = true;
-          }
-        }
-        if (!foundLeg && activeLineX1 !== null && activeLineX1 >= targetHtfStartBar) {
-          if (prevExtremePrice !== null && curExtremePrice !== null) {
-            const legLen = Math.abs(curExtremePrice - prevExtremePrice);
-            if (newSynthBullish) {
-              first_leg_ext_target = Math.max(prevExtremePrice, curExtremePrice) + (legLen * extRatio);
-            } else {
-              first_leg_ext_target = Math.min(prevExtremePrice, curExtremePrice) - (legLen * extRatio);
-            }
-          }
-        }
+        hasSignaledCurrentSynthDir = false;
       }
 
       // ── Local ST Leg Tracking ──
@@ -197,9 +177,18 @@ function checkEWT(candles, params = {}) {
 
         if (curExtremePrice === null) {
           curExtremePrice = isBull ? h : l;
+          curExtremeBar = i;
         }
 
         if (prevLocalDir !== 0 && localDirArr[i] !== prevLocalDir) {
+          // ── Fast Break target setup (using OLD extreme values before overwrite) ──
+          if (curExtremeBar !== null && prevExtremeBar !== null) {
+            targetLevelToBreak = prevExtremePrice;
+            targetPeakValleyBar = curExtremeBar;
+            prevLegFormingTime = Math.max(1, curExtremeBar - prevExtremeBar);
+          }
+          breakDoneInLocalLeg = false;  // Reset break tracking for the new local ST leg
+
           legRefs.push({
             x1: activeLineX1,
             x2: i,
@@ -208,15 +197,19 @@ function checkEWT(candles, params = {}) {
             isBull: activeIsBull
           });
 
+          prevExtremeBar = curExtremeBar;
           prevExtremePrice = curExtremePrice;
           curExtremePrice = isBull ? h : l;
+          curExtremeBar = i;
           activeIsBull = isBull;
           activeLineX1 = i;
         } else {
           if (isBull && (curExtremePrice === null || h >= curExtremePrice)) {
             curExtremePrice = h;
+            curExtremeBar = i;
           } else if (!isBull && (curExtremePrice === null || l <= curExtremePrice)) {
             curExtremePrice = l;
+            curExtremeBar = i;
           }
         }
 
@@ -225,88 +218,74 @@ function checkEWT(candles, params = {}) {
           localStLine = localSTArr[i];
         }
 
+        // ── Fast Break Check (matches Pine) ──
+        const isLocalBullishAtI = localDirArr[i] === -1;
+        const isSynthBullishAtI = synthDirArr[i] === -1;
+        const fastModeContinuous = fastBreakMode === 'Continuous Entries';
+        const allowSynthSignal = fastModeContinuous || !hasSignaledCurrentSynthDir;
+        let fastBreakBullBar = false;
+        let fastBreakBearBar = false;
+
+        if (allowSynthSignal && !breakDoneInLocalLeg && targetLevelToBreak !== null && prevLegFormingTime !== null && targetPeakValleyBar !== null) {
+          const breakTime = i - targetPeakValleyBar;
+
+          if (isLocalBullishAtI) {
+            const currentBarBreak = h > targetLevelToBreak && breakTime < prevLegFormingTime;
+            if (currentBarBreak) {
+              breakDoneInLocalLeg = true;  // Lock leg to prevent future triggers in this local leg section
+              if (isSynthBullishAtI) {
+                fastBreakBullBar = true;
+                hasSignaledCurrentSynthDir = true;
+              }
+            }
+          } else if (!isLocalBullishAtI) {
+            const currentBarBreak = l < targetLevelToBreak && breakTime < prevLegFormingTime;
+            if (currentBarBreak) {
+              breakDoneInLocalLeg = true;
+              if (!isSynthBullishAtI) {
+                fastBreakBearBar = true;
+                hasSignaledCurrentSynthDir = true;
+              }
+            }
+          }
+        }
+
+        // Deferred Signal: break occurred earlier in this local leg, synth direction matched later
+        if (allowSynthSignal && breakDoneInLocalLeg && !hasSignaledCurrentSynthDir) {
+          if (isLocalBullishAtI && isSynthBullishAtI) {
+            fastBreakBullBar = true;
+            hasSignaledCurrentSynthDir = true;
+          } else if (!isLocalBullishAtI && !isSynthBullishAtI) {
+            fastBreakBearBar = true;
+            hasSignaledCurrentSynthDir = true;
+          }
+        }
+
+        if (i === length - 1) {
+          fastBreakBullTrigger = fastBreakBullBar;
+          fastBreakBearTrigger = fastBreakBearBar;
+        }
+
         prevLocalDir = localDirArr[i];
       }
     }
 
     // ── Post-loop: Signal Generation (last bar only) ──────────────────
     const lastIdx = length - 1;
-    const isSynthBullish = synthDirArr[lastIdx] === -1;
-    const isSynthBearish = synthDirArr[lastIdx] === 1;
-    const isLocalBullish = localDir === -1;
-    const isLocalBearish = localDir === 1;
     const lastSynthStLine = synthStLineArr[lastIdx] !== null ? synthStLineArr[lastIdx] : lastStLine;
-    const htfChanged = htfChangedArr[lastIdx];
-
-    let localDirChanged = false;
-    if (lastIdx >= 1) {
-      const lastDir = localDirArr[lastIdx];
-      const prevDir = localDirArr[lastIdx - 1];
-      if (lastDir !== null && lastDir !== 0 && prevDir !== null && prevDir !== 0) {
-        localDirChanged = lastDir !== prevDir;
-      }
-    }
-
-    const currentHtfLegCount = (() => {
-      let count = 1;
-      if (targetHtfStartBar !== null) {
-        for (let li = legRefs.length - 1; li >= 0; li--) {
-          const leg = legRefs[li];
-          if (leg.x1 >= targetHtfStartBar) {
-            count += 1;
-          } else {
-            break;
-          }
-        }
-      }
-      return count;
-    })();
-
-    const passLegCountFilter = currentHtfLegCount <= maxLegsAllowed;
-
-    let passExtFilter = true;
-    if (useExtFilter && first_leg_ext_target !== null) {
-      if (isSynthBullish) {
-        passExtFilter = opens[lastIdx] <= first_leg_ext_target;
-      } else {
-        passExtFilter = opens[lastIdx] >= first_leg_ext_target;
-      }
-    }
-
-    const signalsAllowed = passLegCountFilter && passExtFilter;
-    const longAllowed = tradeMode === 'Continuous Entries' || !htfLongTaken;
-    const shortAllowed = tradeMode === 'Continuous Entries' || !htfShortTaken;
-    const isHighReturnBar = isHighReturnBars[lastIdx];
-
-    const m15BullSignal = localDirChanged && isLocalBullish;
-    const m15BearSignal = localDirChanged && isLocalBearish;
-    const synthBullSignal = htfChanged && isSynthBullish;
-    const synthBearSignal = htfChanged && isSynthBearish;
-    const usePrimarySignal = false;
-    const entryLongPrimary = usePrimarySignal && m15BullSignal && isSynthBullish && isHighReturnBar && longAllowed && signalsAllowed;
-    const entryShortPrimary =usePrimarySignal && m15BearSignal && isSynthBearish && isHighReturnBar && shortAllowed && signalsAllowed;
-
-    const entryLongAdditional = synthBullSignal && isHighReturnBar && signalsAllowed;
-    const entryShortAdditional = synthBearSignal && isHighReturnBar && signalsAllowed;
-
-    const finalEntryLong = entryLongPrimary || entryLongAdditional;
-    const finalEntryShort = entryShortPrimary || entryShortAdditional;
-
-    if (finalEntryLong) htfLongTaken = true;
-    if (finalEntryShort) htfShortTaken = true;
 
     let signal = 'none';
     let met = false;
     let sl_price = null;
 
-    if (finalEntryLong) {
+    if (fastBreakBullTrigger) {
       met = true;
-      signal = 'bullish_crossover';
-      sl_price = prevExtremePrice !== null ? prevExtremePrice : lastSynthStLine;
-    } else if (finalEntryShort) {
+      signal = 'fast_break_bullish';
+      sl_price = prevExtremePrice !== null ? Math.max(prevExtremePrice, lastSynthStLine) : lastSynthStLine;
+    } else if (fastBreakBearTrigger) {
       met = true;
-      signal = 'bearish_crossover';
-      sl_price = prevExtremePrice !== null ? prevExtremePrice : lastSynthStLine;
+      signal = 'fast_break_bearish';
+      sl_price = prevExtremePrice !== null ? Math.min(prevExtremePrice, lastSynthStLine) : lastSynthStLine;
     }
 
     const result = {
@@ -315,26 +294,37 @@ function checkEWT(candles, params = {}) {
       price: closes[lastIdx],
       sl_price,
       details: {
-        zScore: meanReturn[lastIdx] !== null && stdReturn[lastIdx] !== null
-          ? (absReturns[lastIdx] - meanReturn[lastIdx]) / stdReturn[lastIdx] : 0,
-        isHighReturnBar,
         synthDir: synthDirArr[lastIdx],
         localDir,
-        htfChanged,
-        localDirChanged,
-        isSynthBullish,
-        isLocalBullish,
-        primaryLong: entryLongPrimary,
-        primaryShort: entryShortPrimary,
-        additionalLong: entryLongAdditional,
-        additionalShort: entryShortAdditional,
         prevExtremePrice,
-        passLegCountFilter,
-        passExtFilter,
-        currentHtfLegCount,
-        first_leg_ext_target,
+        fastBreakBullTrigger,
+        fastBreakBearTrigger,
+        targetLevelToBreak,
+        lastSynthStLine,
       }
     };
+
+    const currentPrice = closes[lastIdx];
+    const vsTarget = targetLevelToBreak !== null
+      ? (currentPrice > targetLevelToBreak ? 'above' : currentPrice < targetLevelToBreak ? 'below' : 'equal')
+      : 'n/a';
+    const synthDir = synthDirArr[lastIdx];
+    const breakStatus = breakDoneInLocalLeg ? 'broke' : 'not_broke';
+    const breakTiming = targetPeakValleyBar !== null && prevLegFormingTime !== null
+      ? ((lastIdx - targetPeakValleyBar) < prevLegFormingTime ? 'fast' : 'slow')
+      : 'n/a';
+    const alignStatus = synthDir === localDir ? 'aligned' : 'not_aligned';
+    const signalStatus = met ? 'triggered' : 'none';
+    const slPriceStr = sl_price !== null ? sl_price : 'null';
+    const prevExtStr = prevExtremePrice !== null ? prevExtremePrice : 'null';
+    const msg = `symbol=${symbol} tf=${timeframe} currentPrice=${currentPrice} targetLevelToBreak=${targetLevelToBreak} priceVsTarget=${vsTarget} synthDir=${synthDir} localDir=${localDir} breakStatus=${breakStatus} breakTiming=${breakTiming} alignStatus=${alignStatus} signalStatus=${signalStatus} sl_price=${slPriceStr} prevExtremePrice=${prevExtStr}`;
+    if (met) {
+      logger.info(`EWT FAST BREAK: ${msg}`);
+      console.log(`EWT FAST BREAK: ${msg}`);
+    } else {
+      logger.info(`EWT CHECK: ${msg}`);
+      console.log(`EWT CHECK: ${msg}`);
+    }
 
     return result;
 
@@ -344,88 +334,4 @@ function checkEWT(candles, params = {}) {
   }
 }
 
-function getEWTSwingPrice(candles, side, params = {}) {
-  try {
-    const localAtrLen = params.localAtrLen || 10;
-    const localMult = params.localMult || 3.0;
-
-    const highs = candles.map(c => c.high);
-    const lows = candles.map(c => c.low);
-    const closes = candles.map(c => c.close);
-
-    const { direction } = _calculateSuperTrendAligned(highs, lows, closes, localAtrLen, localMult);
-
-    const length = direction.length;
-    const sections = [];
-    let currentSection = null;
-
-    for (let i = 0; i < length; i++) {
-      if (direction[i] === null || direction[i] === 0) continue;
-      const type = direction[i] === -1 ? 'bullish' : 'bearish';
-
-      if (currentSection === null) {
-        currentSection = { type, startCandle: i, endCandle: i };
-      } else if (type !== currentSection.type) {
-        currentSection.duration = currentSection.endCandle - currentSection.startCandle + 1;
-        sections.push({ ...currentSection });
-        currentSection = { type, startCandle: i, endCandle: i };
-      } else {
-        currentSection.endCandle = i;
-      }
-    }
-
-    if (currentSection !== null) {
-      currentSection.duration = currentSection.endCandle - currentSection.startCandle + 1;
-      sections.push({ ...currentSection });
-    }
-
-    if (sections.length < 2) {
-      return { price: null, error: 'Not enough EWT sections for swing detection' };
-    }
-
-    const lastSection = sections[sections.length - 1];
-    const prevSection = sections[sections.length - 2];
-
-    let swingPrice = null;
-    let targetSection = null;
-
-    if (side === 'long') {
-      targetSection = lastSection.type === 'bearish'
-        ? lastSection
-        : prevSection.type === 'bearish' ? prevSection : null;
-      if (targetSection) {
-        const sectionLows = lows.slice(targetSection.startCandle, targetSection.endCandle + 1);
-        swingPrice = Math.min(...sectionLows);
-      }
-    } else if (side === 'short') {
-      targetSection = lastSection.type === 'bullish'
-        ? lastSection
-        : prevSection.type === 'bullish' ? prevSection : null;
-      if (targetSection) {
-        const sectionHighs = highs.slice(targetSection.startCandle, targetSection.endCandle + 1);
-        swingPrice = Math.max(...sectionHighs);
-      }
-    }
-
-    if (swingPrice === null || swingPrice <= 0) {
-      return { price: null, error: 'Could not determine swing price from EWT sections' };
-    }
-
-    logger.info(`EWT swing price for ${side}: $${swingPrice}`);
-    return {
-      price: swingPrice,
-      sections: sections.length,
-      sectionType: lastSection.type,
-      details: {
-        lastSection,
-        prevSection,
-        targetSection,
-      }
-    };
-  } catch (error) {
-    logger.error('Error getting EWT swing price:', error);
-    return { price: null, error: error.message };
-  }
-}
-
-module.exports = { checkEWT, getEWTSwingPrice };
+module.exports = { checkEWT };

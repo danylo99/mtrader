@@ -160,6 +160,28 @@ CREATE TABLE IF NOT EXISTS ew_screener_subscriptions (
 );
 CREATE INDEX IF NOT EXISTS idx_ew_sub_user ON ew_screener_subscriptions(user_id);
 
+-- Per-user EW Fast Break screener telegram subscriptions
+CREATE TABLE IF NOT EXISTS ew_fast_break_tf_subscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  timeframe TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(user_id, timeframe)
+);
+CREATE INDEX IF NOT EXISTS idx_ew_fast_break_tf_user ON ew_fast_break_tf_subscriptions(user_id);
+
+-- Per-user EW Fast Break screener asset telegram subscriptions
+CREATE TABLE IF NOT EXISTS ew_fast_break_asset_subscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  symbol TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(user_id, symbol)
+);
+CREATE INDEX IF NOT EXISTS idx_ew_fast_break_asset_user ON ew_fast_break_asset_subscriptions(user_id);
+
 -- User price-level alarms (Bybit closed-candle based)
 CREATE TABLE IF NOT EXISTS price_alarms (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

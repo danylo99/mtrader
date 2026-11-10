@@ -38,6 +38,7 @@ export default function SetupFormPage() {
     exit_indicator_type: undefined,
     exit_indicator_tf: undefined,
     exit_pricelevel_value: 0,
+    fastBreakMode: 'Continuous Entries',
   });
 
   useEffect(() => {
@@ -367,6 +368,20 @@ type="number"
                 className="w-full sm:max-w-xs rounded-lg border border-slate-600 bg-slate-700/50 px-4 py-2.5 text-white outline-none focus:border-blue-500"
                 required
               />
+            </div>
+          )}
+          {formData.entry_indicator_type === 'ewt' && (
+            <div className="mt-4">
+              <label className="mb-1 block text-sm text-slate-400">Fast Break Mode</label>
+              <select
+                value={formData.fastBreakMode ?? 'Continuous Entries'}
+                onChange={(e) => updateField('fastBreakMode', e.target.value as 'Continuous Entries' | 'Only Once per Synth Dir')}
+                className="w-full sm:max-w-xs rounded-lg border border-slate-600 bg-slate-700/50 px-4 py-2.5 text-white outline-none focus:border-blue-500"
+              >
+                <option value="Continuous Entries">Continuous Entries</option>
+                <option value="Only Once per Synth Dir">Only Once per Synth Dir</option>
+              </select>
+              <p className="mt-1 text-xs text-slate-500">Controls whether a new fast break signal fires on every qualifying break or only once per synthetic ST direction.</p>
             </div>
           )}
         </div>

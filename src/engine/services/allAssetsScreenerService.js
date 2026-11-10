@@ -247,23 +247,7 @@ static async _updateSTDirection(symbol, timeframe, bars) {
   static async _computeEW(symbol, timeframe, bars) {
     if (bars.length < 500) return;
 
-    const ewParams = {
-      barsPerHour: 4,
-      barsPerHour2: 16,
-      macroAtrLen: 10,
-      macroMult: 3.0,
-      localAtrLen: 10,
-      localMult: 3.0,
-      zscoreLength: 500,
-      zscoreMin: 1.8,
-      zscoreMax: 10.0,
-      useWickFilter: true,
-      maxWickRatio: 0.3,
-      maxLegsAllowed: 5,
-      useExtFilter: true,
-      extMultiplier: 1.27,
-      tradeMode: 'First Change Only'
-    };
+    const ewParams = { ...IndicatorService.getIndicatorParameters('ewt'), symbol, timeframe };
 
     const ewResult = IndicatorService.checkCondition('ewt', bars, ewParams);
 

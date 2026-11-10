@@ -109,6 +109,7 @@ export interface SetupFormData {
   exit_indicator_type?: EntryIndicatorType;
   exit_indicator_tf?: Timeframe;
   exit_pricelevel_value: number;
+  fastBreakMode?: 'Continuous Entries' | 'Only Once per Synth Dir';
 }
 
 export interface ApiResponse<T = unknown> {

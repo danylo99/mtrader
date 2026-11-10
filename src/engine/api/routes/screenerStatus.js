@@ -25,6 +25,17 @@ router.get('/ew', async (req, res) => {
   }
 });
 
+router.get('/ew-fast-break', async (req, res) => {
+  try {
+    const db = getDatabaseManager();
+    const rows = await db.getScreenerSnapshots('ewt');
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    logger.error('Failed to fetch EW Fast Break snapshots:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 router.get('/mazscore', async (req, res) => {
   try {
     const db = getDatabaseManager();

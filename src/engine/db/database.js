@@ -131,8 +131,10 @@ class Database {
       await this.runExchangeAccountsMigration();
       // Run screener rework migration
       await this.runScreenerReworkMigration();
-      // Run EW subscriptions migration
-      await this.runEwSubscriptionsMigration();
+      // Run EW Fast Break subscriptions migration
+      await this.runEwFastBreakSubscriptionsMigration();
+      // Run EW Fast Break asset subscriptions migration
+      await this.runEwFastBreakAssetSubscriptionsMigration();
       // Run price alarms migration
       await this.runPriceAlarmsMigration();
       // Run MA Z-Score subscriptions migration
@@ -170,13 +172,23 @@ class Database {
     }
   }
 
-  async runEwSubscriptionsMigration() {
+  async runEwFastBreakSubscriptionsMigration() {
     try {
-      const Migration = require('./migrate_ew_subscriptions');
+      const Migration = require('./migrate_ew_fast_break_subscriptions');
       const migration = new Migration(this);
       await migration.runMigration();
     } catch (error) {
-      logger.error('EW subscriptions migration failed:', error);
+      logger.error('EW Fast Break subscriptions migration failed:', error);
+    }
+  }
+
+  async runEwFastBreakAssetSubscriptionsMigration() {
+    try {
+      const Migration = require('./migrate_ew_fast_break_asset_subscriptions');
+      const migration = new Migration(this);
+      await migration.runMigration();
+    } catch (error) {
+      logger.error('EW Fast Break asset subscriptions migration failed:', error);
     }
   }
 
@@ -559,14 +571,6 @@ async getExchangeAccountByIndex(index) {
     return this.get(sql, [index]);
   }
 
-  async getEwSubscriptionsByUser(userId) {
-    const sql = `
-      SELECT timeframe, enabled FROM ew_screener_subscriptions
-      WHERE user_id = ? AND enabled = 1
-    `;
-    return this.all(sql, [userId]);
-  }
-
   async getEnabledEwSubscribers() {
     const sql = `
       SELECT user_id, timeframe FROM ew_screener_subscriptions WHERE enabled = 1
@@ -574,12 +578,62 @@ async getExchangeAccountByIndex(index) {
     return this.all(sql);
   }
 
-  async replaceEwSubscriptionsForUser(userId, timeframes) {
-    await this.run('DELETE FROM ew_screener_subscriptions WHERE user_id = ?', [userId]);
+  async getEwFastBreakSubscriptionsByUser(userId) {
+    const sql = `
+      SELECT timeframe, enabled FROM ew_fast_break_tf_subscriptions
+      WHERE user_id = ? AND enabled = 1
+    `;
+    return this.all(sql, [userId]);
+  }
+
+  async getEnabledEwFastBreakSubscribers() {
+    const sql = `
+      SELECT user_id, timeframe FROM ew_fast_break_tf_subscriptions WHERE enabled = 1
+    `;
+    return this.all(sql);
+  }
+
+  async replaceEwFastBreakSubscriptionsForUser(userId, timeframes) {
+    await this.run('DELETE FROM ew_fast_break_tf_subscriptions WHERE user_id = ?', [userId]);
     for (const tf of timeframes) {
       await this.run(
-        'INSERT INTO ew_screener_subscriptions (user_id, timeframe, enabled) VALUES (?, ?, 1)',
+        'INSERT INTO ew_fast_break_tf_subscriptions (user_id, timeframe, enabled) VALUES (?, ?, 1)',
         [userId, tf]
+      );
+    }
+  }
+
+  async getEwFastBreakAssetSubscriptionsByUser(userId) {
+    const sql = `
+      SELECT symbol, enabled FROM ew_fast_break_asset_subscriptions
+      WHERE user_id = ? AND enabled = 1
+    `;
+    return this.all(sql, [userId]);
+  }
+
+  async getEnabledEwFastBreakAssetSubscribers() {
+    const sql = `
+      SELECT user_id, symbol FROM ew_fast_break_asset_subscriptions WHERE enabled = 1
+    `;
+    return this.all(sql);
+  }
+
+  async getEnabledEwFastBreakSubscribers() {
+    const sql = `
+      SELECT ast.user_id, ast.symbol, tf.timeframe
+      FROM ew_fast_break_asset_subscriptions ast
+      JOIN ew_fast_break_tf_subscriptions tf ON ast.user_id = tf.user_id
+      WHERE ast.enabled = 1 AND tf.enabled = 1
+    `;
+    return this.all(sql);
+  }
+
+  async replaceEwFastBreakAssetSubscriptionsForUser(userId, symbols) {
+    await this.run('DELETE FROM ew_fast_break_asset_subscriptions WHERE user_id = ?', [userId]);
+    for (const sym of symbols) {
+      await this.run(
+        'INSERT INTO ew_fast_break_asset_subscriptions (user_id, symbol, enabled) VALUES (?, ?, 1)',
+        [userId, sym]
       );
     }
   }

@@ -14,7 +14,8 @@ class MessageBatcher {
   ]);
 
   static SCREENER_MESSAGE_TYPES = new Set([
-    'screener_reversal'
+    'screener_reversal',
+    'screener_fast_break'
   ]);
 
   static ALARM_MESSAGE_TYPES = new Set([
