@@ -321,24 +321,27 @@ function checkEWT(candles, params = {}) {
         fastBreakBearTrigger,
         targetLevelToBreak,
         lastSynthStLine,
+        breakStatus: breakDoneInLocalLeg ? 'broke' : 'not_broke',
+        breakDetectedTime,
+        formingBars: prevLegFormingTime,
+        breakTiming: breakDetectedTime !== null && prevLegFormingTime !== null
+          ? (breakDetectedTime < prevLegFormingTime ? 'fast' : 'slow')
+          : 'n/a',
+        alignStatus: synthDirArr[lastIdx] === localDir ? 'aligned' : 'not_aligned',
+        signalStatus: met ? 'triggered' : 'none',
+        signalAlreadySignaled: hasSignaledCurrentSynthDir ? 'yes' : 'no',
       }
     };
 
     if (source === 'entry') {
       const currentPrice = closes[lastIdx];
+      const d = result.details;
       const vsTarget = targetLevelToBreak !== null
         ? (currentPrice > targetLevelToBreak ? 'above' : currentPrice < targetLevelToBreak ? 'below' : 'equal')
         : 'n/a';
-      const synthDir = synthDirArr[lastIdx];
-      const breakStatus = breakDoneInLocalLeg ? 'broke' : 'not_broke';
-      const breakTiming = targetPeakValleyBar !== null && prevLegFormingTime !== null
-        ? ((lastIdx - targetPeakValleyBar) < prevLegFormingTime ? 'fast' : 'slow')
-        : 'n/a';
-      const alignStatus = synthDir === localDir ? 'aligned' : 'not_aligned';
-      const signalStatus = met ? 'triggered' : 'none';
       const slPriceStr = sl_price !== null ? sl_price : 'null';
       const prevExtStr = prevExtremePrice !== null ? prevExtremePrice : 'null';
-      const msg = `symbol=${symbol} tf=${timeframe} currentPrice=${currentPrice} targetLevelToBreak=${targetLevelToBreak} priceVsTarget=${vsTarget} synthDir=${synthDir} localDir=${localDir} breakStatus=${breakStatus} breakTiming=${breakTiming} alignStatus=${alignStatus} signalStatus=${signalStatus} sl_price=${slPriceStr} prevExtremePrice=${prevExtStr}`;
+      const msg = `symbol=${symbol} tf=${timeframe} currentPrice=${currentPrice} targetLevelToBreak=${targetLevelToBreak} priceVsTarget=${vsTarget} synthDir=${d.synthDir} localDir=${d.localDir} breakStatus=${d.breakStatus} breakTiming=${d.breakTiming} alignStatus=${d.alignStatus} signalStatus=${d.signalStatus} sl_price=${slPriceStr} prevExtremePrice=${prevExtStr}`;
       if (met) {
         logger.info(`EWT FAST BREAK (ENTRY): ${msg}`);
         console.log(`EWT FAST BREAK (ENTRY): ${msg}`);
@@ -352,19 +355,11 @@ function checkEWT(candles, params = {}) {
       const currentPrice = closes[lastIdx];
       const currentHigh = highs[lastIdx];
       const currentLow = lows[lastIdx];
+      const d = result.details;
       const vsTarget = targetLevelToBreak !== null
         ? (currentPrice > targetLevelToBreak ? 'above' : currentPrice < targetLevelToBreak ? 'below' : 'equal')
         : 'n/a';
-      const synthDir = synthDirArr[lastIdx];
-      const breakStatus = breakDoneInLocalLeg ? 'broke' : 'not_broke';
-      const formingBars = prevLegFormingTime !== null ? prevLegFormingTime : null;
-      const breakTiming = breakDetectedTime !== null && formingBars !== null
-        ? (breakDetectedTime < formingBars ? 'fast' : 'slow')
-        : 'n/a';
-      const alignStatus = synthDir === localDir ? 'aligned' : 'not_aligned';
-      const signalStatus = met ? 'triggered' : 'none';
-      const signalAlreadySignaled = hasSignaledCurrentSynthDir ? 'yes' : 'no';
-      const msg = `symbol=${symbol} tf=${timeframe} breakTs=${breakDetectedTimestamp} currentPrice=${currentPrice} currentHigh=${currentHigh} currentLow=${currentLow} targetLevelToBreak=${targetLevelToBreak} priceVsTarget=${vsTarget} synthDir=${synthDir} localDir=${localDir} breakStatus=${breakStatus} breakDetectedTime=${breakDetectedTime} formingBars=${formingBars} breakTiming=${breakTiming} alignStatus=${alignStatus} signalStatus=${signalStatus} signalAlreadySignaled=${signalAlreadySignaled}`;
+      const msg = `symbol=${symbol} tf=${timeframe} breakTs=${breakDetectedTimestamp} currentPrice=${currentPrice} currentHigh=${currentHigh} currentLow=${currentLow} targetLevelToBreak=${targetLevelToBreak} priceVsTarget=${vsTarget} synthDir=${d.synthDir} localDir=${d.localDir} breakStatus=${d.breakStatus} breakDetectedTime=${d.breakDetectedTime} formingBars=${d.formingBars} breakTiming=${d.breakTiming} alignStatus=${d.alignStatus} signalStatus=${d.signalStatus} signalAlreadySignaled=${d.signalAlreadySignaled}`;
       console.log(`EWT DEBUG: ${msg}`);
       logger.info(`EWT DEBUG: ${msg}`);
     }
