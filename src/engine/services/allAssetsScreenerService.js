@@ -25,6 +25,9 @@ class AllAssetsScreenerService {
   static ewSubscribersCache = null;
   static ewSubscribersCacheTs = 0;
   static EW_SUBSCRIBERS_CACHE_MS = 30 * 1000;
+  static ewFastBreakSubscribersCache = null;
+  static ewFastBreakSubscribersCacheTs = 0;
+  static EW_FAST_BREAK_SUBSCRIBERS_CACHE_MS = 30 * 1000;
   static SUPERTREND_ASSET_CACHE_MS = 30 * 1000;
   static supertrendAssetSubscribersCache = null;
   static supertrendAssetSubscribersCacheTs = 0;
@@ -50,6 +53,8 @@ class AllAssetsScreenerService {
     this.telegramService = telegramService;
     this.ewSubscribersCache = null;
     this.ewSubscribersCacheTs = 0;
+    this.ewFastBreakSubscribersCache = null;
+    this.ewFastBreakSubscribersCacheTs = 0;
     this.supertrendAssetSubscribersCache = null;
     this.supertrendAssetSubscribersCacheTs = 0;
   }
@@ -62,6 +67,11 @@ class AllAssetsScreenerService {
   static invalidateEwSubscribersCache() {
     this.ewSubscribersCache = null;
     this.ewSubscribersCacheTs = 0;
+  }
+
+  static invalidateEwFastBreakSubscribersCache() {
+    this.ewFastBreakSubscribersCache = null;
+    this.ewFastBreakSubscribersCacheTs = 0;
   }
 
   static invalidateMazscoreCaches() {
@@ -121,6 +131,28 @@ class AllAssetsScreenerService {
     for (const row of this.ewSubscribersCache) {
       hasAny = true;
       if (row.timeframe === timeframe) userIds.add(row.user_id);
+    }
+    return { userIds: Array.from(userIds), hasAnySubscriptions: hasAny };
+  }
+
+  static async _getEwFastBreakSubscribers(symbol, timeframe) {
+    if (!this.db) return { userIds: [], hasAnySubscriptions: false };
+    const now = Date.now();
+    if (!this.ewFastBreakSubscribersCache || now - this.ewFastBreakSubscribersCacheTs > this.EW_FAST_BREAK_SUBSCRIBERS_CACHE_MS) {
+      try {
+        const rows = await this.db.getEnabledEwFastBreakSubscribers();
+        this.ewFastBreakSubscribersCache = rows;
+        this.ewFastBreakSubscribersCacheTs = now;
+      } catch (err) {
+        logger.error('Failed to load EW Fast Break subscribers:', err.message);
+        return { userIds: [], hasAnySubscriptions: false };
+      }
+    }
+    const userIds = new Set();
+    let hasAny = false;
+    for (const row of this.ewFastBreakSubscribersCache) {
+      hasAny = true;
+      if (row.symbol === symbol && row.timeframe === timeframe) userIds.add(row.user_id);
     }
     return { userIds: Array.from(userIds), hasAnySubscriptions: hasAny };
   }
@@ -267,11 +299,28 @@ static async _updateSTDirection(symbol, timeframe, bars) {
         const price = lastBar ? lastBar.close : 0;
         const timestamp = lastBar && lastBar.timestamp ? lastBar.timestamp : new Date().toISOString();
 
-        const { userIds: subscribers, hasAnySubscriptions } = await this._getSubscribersForTimeframe(timeframe);
+        const isFastBreak = ewResult.signal.startsWith('fast_break_');
+        let subscribers = [];
+        let hasAnySubscriptions = false;
+        let indicatorType = 'EW';
+        let notificationType = 'screener_reversal';
+
+        if (isFastBreak) {
+          const result = await this._getEwFastBreakSubscribers(symbol, timeframe);
+          subscribers = result.userIds;
+          hasAnySubscriptions = result.hasAnySubscriptions;
+          indicatorType = 'EWT_FAST_BREAK';
+          notificationType = 'screener_fast_break';
+        } else {
+          const result = await this._getSubscribersForTimeframe(timeframe);
+          subscribers = result.userIds;
+          hasAnySubscriptions = result.hasAnySubscriptions;
+        }
+
         const payload = {
           symbol,
           timeframe,
-          indicatorType: 'EW',
+          indicatorType,
           signal: ewResult.signal,
           price,
           exchange: this.currentExchange,
@@ -281,7 +330,7 @@ static async _updateSTDirection(symbol, timeframe, bars) {
 
         if (subscribers.length > 0) {
           for (const userId of subscribers) {
-            await this.telegramService.sendNotification(userId, 'screener_reversal', payload);
+            await this.telegramService.sendNotification(userId, notificationType, payload);
           }
         }
 
