@@ -280,7 +280,7 @@ class CandleProvider {
     }
     if (raw[0] > current[0]) {
       const arr = this.store.get(key) || [];
-      arr.push(raw);
+      arr.push(current);
       while (arr.length > this.limit) arr.shift();
       this.store.set(key, arr);
       this.currentCandles.set(key, raw);
@@ -307,7 +307,7 @@ class CandleProvider {
     }
     if (raw[0] > current[0]) {
       const arr = this.store.get(key) || [];
-      arr.push(raw);
+      arr.push(current);
       while (arr.length > this.limit) arr.shift();
       this.store.set(key, arr);
       this.currentCandles.set(key, raw);
@@ -386,7 +386,7 @@ class CandleProvider {
     }
     if (raw[0] > current[0]) {
       const arr = this.store.get(key) || [];
-      arr.push(raw);
+      arr.push(current);
       while (arr.length > this.limit) arr.shift();
       this.store.set(key, arr);
       this.currentCandles.set(key, raw);
