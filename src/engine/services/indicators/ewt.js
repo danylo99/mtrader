@@ -306,7 +306,7 @@ function checkEWT(candles, params = {}) {
     }
 
     const debugSymbols = ['BNB/USDT:USDT', 'BTC/USDT:USDT'];
-    const isDebugSymbol = debugSymbols.includes(symbol) && timeframe === 'm5';
+    const isDebugSymbol = debugSymbols.includes(symbol);
 
     const result = {
       met,
