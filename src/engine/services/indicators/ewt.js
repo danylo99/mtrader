@@ -341,12 +341,14 @@ function checkEWT(candles, params = {}) {
         : 'n/a';
       const synthDir = synthDirArr[lastIdx];
       const breakStatus = breakDoneInLocalLeg ? 'broke' : 'not_broke';
+      const breakTime = targetPeakValleyBar !== null ? lastIdx - targetPeakValleyBar : null;
+      const formingBars = prevLegFormingTime !== null ? prevLegFormingTime : null;
       const breakTiming = targetPeakValleyBar !== null && prevLegFormingTime !== null
         ? ((lastIdx - targetPeakValleyBar) < prevLegFormingTime ? 'fast' : 'slow')
         : 'n/a';
       const alignStatus = synthDir === localDir ? 'aligned' : 'not_aligned';
       const signalStatus = met ? 'triggered' : 'none';
-      const msg = `symbol=${symbol} tf=${timeframe} currentPrice=${currentPrice} currentHigh=${currentHigh} currentLow=${currentLow} targetLevelToBreak=${targetLevelToBreak} priceVsTarget=${vsTarget} synthDir=${synthDir} localDir=${localDir} breakStatus=${breakStatus} breakTiming=${breakTiming} alignStatus=${alignStatus} signalStatus=${signalStatus}`;
+      const msg = `symbol=${symbol} tf=${timeframe} currentPrice=${currentPrice} currentHigh=${currentHigh} currentLow=${currentLow} targetLevelToBreak=${targetLevelToBreak} priceVsTarget=${vsTarget} synthDir=${synthDir} localDir=${localDir} breakStatus=${breakStatus} breakTime=${breakTime} formingBars=${formingBars} breakTiming=${breakTiming} alignStatus=${alignStatus} signalStatus=${signalStatus}`;
       console.log(`EWT DEBUG: ${msg}`);
       logger.info(`EWT DEBUG: ${msg}`);
     }
