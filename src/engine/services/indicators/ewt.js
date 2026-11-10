@@ -195,6 +195,9 @@ function checkEWT(candles, params = {}) {
           breakDetectedBar = null;
           breakDetectedTime = null;
           breakDetectedTimestamp = null;
+          if (fastBreakMode === 'Continuous Entries') {
+            hasSignaledCurrentSynthDir = false;  // Reset signaled flag for new leg in continuous mode
+          }
 
           legRefs.push({
             x1: activeLineX1,
