@@ -67,7 +67,7 @@ class ScreenerCandleProvider {
       this.candleProvider = new CandleProvider({
         assets,
         timeframes,
-        limit: 1501,
+        limit: 3001,
         onUpdate: (symbol, timeframe, candle) => {},
         onScreenerUpdate: async (symbol, timeframe, closedBars) => {
           if (timeframe !== 'm1') {
