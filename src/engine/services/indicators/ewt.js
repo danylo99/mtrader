@@ -308,9 +308,6 @@ function checkEWT(candles, params = {}) {
       sl_price = prevExtremePrice !== null ? Math.min(prevExtremePrice, lastSynthStLine) : lastSynthStLine;
     }
 
-    const debugSymbols = ['BNB/USDT:USDT', 'BTC/USDT:USDT'];
-    const isDebugSymbol = debugSymbols.includes(symbol);
-
     const result = {
       met,
       signal,
@@ -350,18 +347,6 @@ function checkEWT(candles, params = {}) {
       } else {
         logger.info(`EWT CHECK (ENTRY): ${msg}`);
       }
-    }
-
-    if (isDebugSymbol) {
-      const currentPrice = closes[lastIdx];
-      const currentHigh = highs[lastIdx];
-      const currentLow = lows[lastIdx];
-      const d = result.details;
-      const vsTarget = targetLevelToBreak !== null
-        ? (currentPrice > targetLevelToBreak ? 'above' : currentPrice < targetLevelToBreak ? 'below' : 'equal')
-        : 'n/a';
-      const msg = `symbol=${symbol} tf=${timeframe} breakTs=${breakDetectedTimestamp} currentPrice=${currentPrice} currentHigh=${currentHigh} currentLow=${currentLow} targetLevelToBreak=${targetLevelToBreak} priceVsTarget=${vsTarget} synthDir=${d.synthDir} localDir=${d.localDir} breakStatus=${d.breakStatus} breakDetectedTime=${d.breakDetectedTime} formingBars=${d.formingBars} breakTiming=${d.breakTiming} alignStatus=${d.alignStatus} signalStatus=${d.signalStatus} signalAlreadySignaled=${d.signalAlreadySignaled}`;
-      logger.info(`EWT DEBUG: ${msg}`);
     }
 
     return result;
