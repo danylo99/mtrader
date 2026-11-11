@@ -108,7 +108,6 @@ this.symbolInfoCache.set(exchangeSymbol, info);
         candle[5].toString(), // volume
       ]);
       
-      logger.info(`Fetched ${formattedCandles.length} candles for ${symbol} (${symbol}) ${timeframe} on ${this.exchangeName}`);
       return formattedCandles; // Oldest to newest
     } catch (error) {
       logger.apiError('getCandles', error);

@@ -162,7 +162,6 @@ class BybitService {
       
       if (response.data && response.data.result && response.data.result.list) {
         const candles = response.data.result.list.reverse(); // Oldest to newest
-        logger.info(`Fetched ${candles.length} candles for ${symbol} ${timeframe}`);
         return candles;
       }
       
