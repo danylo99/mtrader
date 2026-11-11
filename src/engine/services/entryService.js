@@ -58,8 +58,8 @@ class EntryService {
     );
     
     if (indicatorResult.met) {
-      const isValidDirection = (setup.side === 'long' && indicatorResult.signal === 'bullish_crossover') ||
-                             (setup.side === 'short' && indicatorResult.signal === 'bearish_crossover');
+      const isValidDirection = (setup.side === 'long' && (indicatorResult.signal === 'bullish_crossover' || indicatorResult.signal === 'fast_break_bullish')) ||
+                             (setup.side === 'short' && (indicatorResult.signal === 'bearish_crossover' || indicatorResult.signal === 'fast_break_bearish'));
       
       if (!isValidDirection) {
         logger.info(`Signal direction mismatch for setup #${setup.id}: expected ${setup.side} but got ${indicatorResult.signal}`);
