@@ -240,7 +240,7 @@ function checkEWT(candles, params = {}) {
           const breakTime = i - targetPeakValleyBar;
 
           if (isLocalBullishAtI) {
-            const currentBarBreak = c > targetLevelToBreak && breakTime < prevLegFormingTime;
+            const currentBarBreak = h > targetLevelToBreak && breakTime < prevLegFormingTime;
             if (currentBarBreak) {
               breakDoneInLocalLeg = true;  // Lock leg to prevent future triggers in this local leg section
               if (breakDetectedBar === null) {
@@ -254,7 +254,7 @@ function checkEWT(candles, params = {}) {
               }
             }
           } else if (!isLocalBullishAtI) {
-            const currentBarBreak = c < targetLevelToBreak && breakTime < prevLegFormingTime;
+            const currentBarBreak = l < targetLevelToBreak && breakTime < prevLegFormingTime;
             if (currentBarBreak) {
               breakDoneInLocalLeg = true;
               if (breakDetectedBar === null) {
