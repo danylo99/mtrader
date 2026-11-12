@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, LayoutDashboard, LogOut, Settings, PlusCircle, ShoppingCart, Menu, X, ChevronDown, Search, Bell, List, MessageCircle, Zap } from 'lucide-react';
+import { Activity, LayoutDashboard, LogOut, Settings, PlusCircle, ShoppingCart, Menu, X, ChevronDown, Search, Bell, List, Zap } from 'lucide-react';
 import engineFetch from '@/lib/api';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -67,7 +67,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard/screener-ew-fast-break', label: 'EW Fast Break', icon: Zap },
     { href: '/dashboard/alarms', label: 'Price Alarms', icon: Bell },
     { href: '/dashboard/assets', label: 'Assets', icon: List },
-    { href: '/dashboard/chat', label: 'Live Prices', icon: MessageCircle },
     { href: '/dashboard/settings', label: 'Settings', icon: Settings },
     { href: '/dashboard/orders/new', label: 'Place Order', icon: ShoppingCart },
     { href: '/dashboard/setups/new', label: 'New Trade', icon: PlusCircle },
@@ -206,13 +205,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             }`}>
             <List className="h-4 w-4" />
             Assets
-          </Link>
-          <Link href="/dashboard/chat"
-            className={`mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-              pathname.startsWith('/dashboard/chat') ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'
-            }`}>
-            <MessageCircle className="h-4 w-4" />
-            Live Prices
           </Link>
           <Link href="/dashboard/orders/new"
             className={`mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
