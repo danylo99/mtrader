@@ -107,7 +107,7 @@ class IndicatorService {
         maxLegsAllowed: 5,
         useExtFilter: true,
         extMultiplier: 1.27,
-        fastBreakMode: 'Continuous Entries',
+        fastBreakMode: 'Only Once per Synth Dir',
       },
       'mazscore': { emaLength: 50, atrLength: 14, lookbackLength: 200 },
       'pricelevel': { priceLevel: 0 },
