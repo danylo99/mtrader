@@ -32,20 +32,6 @@ class AllAssetsScreenerService {
   static supertrendAssetSubscribersCache = null;
   static supertrendAssetSubscribersCacheTs = 0;
   static lastSupertrendSignals = new Map();
-  static mazscoreTfSubscribersCache = null;
-  static mazscoreTfSubscribersCacheTs = 0;
-  static mazscoreAssetSubscribersCache = null;
-  static mazscoreAssetSubscribersCacheTs = 0;
-  static MAZSCORE_ASSET_CACHE_MS = 30 * 1000;
-  static lastMAZScoreAvg = null;
-  static MAZSCORE_ALERT_THRESHOLD = 0.5;
-  static nonMetalSymbols = null;
-  static m15ZScoreMap = new Map();
-  static lastMAZScoreWritten = new Map();
-  static MAZSCORE_PER_ASSET_THRESHOLD = 1.5;
-  static lastMAZScorePerAsset = new Map();
-  static lastMAZScoreExtreme = new Map();
-  static lastMAZScoreAvgExtreme = null;
   static currentExchange = 'hyperliquid'; // Default exchange
 
   static setDeps(db, telegramService) {
@@ -61,7 +47,6 @@ class AllAssetsScreenerService {
 
   static setExchange(exchange) {
     this.currentExchange = exchange;
-    this.nonMetalSymbols = null; // Invalidate cache when exchange changes
   }
 
   static invalidateEwSubscribersCache() {
@@ -72,13 +57,6 @@ class AllAssetsScreenerService {
   static invalidateEwFastBreakSubscribersCache() {
     this.ewFastBreakSubscribersCache = null;
     this.ewFastBreakSubscribersCacheTs = 0;
-  }
-
-  static invalidateMazscoreCaches() {
-    this.mazscoreTfSubscribersCache = null;
-    this.mazscoreTfSubscribersCacheTs = 0;
-    this.mazscoreAssetSubscribersCache = null;
-    this.mazscoreAssetSubscribersCacheTs = 0;
   }
 
   static invalidateSupertrendSubscribersCache() {
@@ -101,11 +79,6 @@ class AllAssetsScreenerService {
       setImmediate(() => {
         this._computeEW(symbol, timeframe, parsedBars).catch(err => {
           logger.error(`EW computation error for ${symbol} ${timeframe}:`, err.message);
-        });
-      });
-      setImmediate(() => {
-        this._computeMAZScore(symbol, timeframe, parsedBars).catch(err => {
-          logger.error(`MA Z-Score computation error for ${symbol} ${timeframe}:`, err.message);
         });
       });
     } catch (error) {
@@ -151,50 +124,6 @@ class AllAssetsScreenerService {
     const userIds = new Set();
     let hasAny = false;
     for (const row of this.ewFastBreakSubscribersCache) {
-      hasAny = true;
-      if (row.symbol === symbol && row.timeframe === timeframe) userIds.add(row.user_id);
-    }
-    return { userIds: Array.from(userIds), hasAnySubscriptions: hasAny };
-  }
-
-  static async _getMazscoreTfSubscribers(timeframe) {
-    if (!this.db) return { userIds: [], hasAnySubscriptions: false };
-    const now = Date.now();
-    if (!this.mazscoreTfSubscribersCache || now - this.mazscoreTfSubscribersCacheTs > this.MAZSCORE_SUBSCRIBERS_CACHE_MS) {
-      try {
-        const rows = await this.db.getEnabledMazscoreTfSubscribers();
-        this.mazscoreTfSubscribersCache = rows;
-        this.mazscoreTfSubscribersCacheTs = now;
-      } catch (err) {
-        logger.error('Failed to load MAZScore TF subscribers:', err.message);
-        return { userIds: [], hasAnySubscriptions: false };
-      }
-    }
-    const userIds = new Set();
-    let hasAny = false;
-    for (const row of this.mazscoreTfSubscribersCache) {
-      hasAny = true;
-      if (row.timeframe === timeframe) userIds.add(row.user_id);
-    }
-    return { userIds: Array.from(userIds), hasAnySubscriptions: hasAny };
-  }
-
-  static async _getMazscoreAssetSubscribers(symbol, timeframe) {
-    if (!this.db) return { userIds: [], hasAnySubscriptions: false };
-    const now = Date.now();
-    if (!this.mazscoreAssetSubscribersCache || now - this.mazscoreAssetSubscribersCacheTs > this.MAZSCORE_ASSET_CACHE_MS) {
-      try {
-        const rows = await this.db.getEnabledMazscoreAssetSubscribers();
-        this.mazscoreAssetSubscribersCache = rows;
-        this.mazscoreAssetSubscribersCacheTs = now;
-      } catch (err) {
-        logger.error('Failed to load MAZScore Asset subscribers:', err.message);
-        return { userIds: [], hasAnySubscriptions: false };
-      }
-    }
-    const userIds = new Set();
-    let hasAny = false;
-    for (const row of this.mazscoreAssetSubscribersCache) {
       hasAny = true;
       if (row.symbol === symbol && row.timeframe === timeframe) userIds.add(row.user_id);
     }
@@ -398,239 +327,8 @@ static async _updateSTDirection(symbol, timeframe, bars) {
     }
   }
 
-  static async _computeMAZScore(symbol, timeframe, bars) {
-    if (bars.length < 20) return;
-
-    const result = IndicatorService.checkCondition('mazscore', bars, { emaLength: 50, atrLength: 14, lookbackLength: 200 });
-
-    if (result.met && result.signal && result.signal !== 'none') {
-      const zScoreVal = parseFloat(result.signal);
-      if (isNaN(zScoreVal)) return;
-
-      const rounded = zScoreVal.toFixed(2);
-      const key = `${symbol}:${timeframe}`;
-      const lastWritten = this.lastMAZScoreWritten.get(key);
-
-      if (rounded !== lastWritten) {
-        await this.db.upsertScreenerSnapshot(symbol, timeframe, 'mazscore', rounded);
-        this.lastMAZScoreWritten.set(key, rounded);
-      }
-
-      if (timeframe === 'm15') {
-        this.m15ZScoreMap.set(symbol, zScoreVal);
-        await this._checkAndSendMAZScoreAlert(symbol, timeframe, bars);
-      }
-
-      await this._checkAndSendPerAssetMAZScoreAlert(symbol, timeframe, zScoreVal, bars);
-    }
-  }
-
-  static async _checkAndSendMAZScoreAlert(symbol, timeframe, bars) {
-    if (!this.db || !this.telegramService) return;
-    if (this.m15ZScoreMap.size === 0) return;
-
-    try {
-      const nonMetalSymbols = this._getNonMetalSymbols();
-      const m15ZValues = [];
-      for (const [sym, val] of this.m15ZScoreMap.entries()) {
-        if (nonMetalSymbols.has(sym)) {
-          m15ZValues.push(val);
-        }
-      }
-
-      if (m15ZValues.length === 0) return;
-
-      const avgZScore = m15ZValues.reduce((a, b) => a + b, 0) / m15ZValues.length;
-      const prevAvg = this.lastMAZScoreAvg;
-
-      this.lastMAZScoreAvg = avgZScore;
-
-      const threshold = this.MAZSCORE_ALERT_THRESHOLD;
-
-      if (prevAvg !== null) {
-        let signalType = null;
-        if (prevAvg <= threshold && avgZScore > threshold) {
-          signalType = 'bullish';
-        } else if (prevAvg >= -threshold && avgZScore < -threshold) {
-          signalType = 'bearish';
-        }
-
-        if (signalType) {
-          this.lastMAZScoreAvgExtreme = signalType;
-          await this.db.upsertScreenerSnapshot('MARKET', 'm15', 'mazscore_avg_extreme', signalType);
-
-          const lastBar = bars[bars.length - 1];
-          const price = lastBar ? lastBar.close : 0;
-          const timestamp = lastBar && lastBar.timestamp ? lastBar.timestamp : new Date().toISOString();
-
-          const payload = {
-            symbol: 'MARKET',
-            timeframe,
-            indicatorType: 'MAZSCORE',
-            signal: signalType,
-            price: avgZScore,
-exchange: this.currentExchange,
-            isTestnet: false,
-            timestamp,
-          };
-
-          const { userIds: subscribers, hasAnySubscriptions } = await this._getMazscoreTfSubscribers(timeframe);
-
-          if (subscribers.length > 0) {
-            for (const userId of subscribers) {
-              await this.telegramService.sendNotification(userId, 'screener_reversal', payload);
-            }
-          }
-
-          logger.info(`MA Z-Score alert sent: ${signalType}, avg=${avgZScore.toFixed(4)}, prev=${prevAvg.toFixed(4)}`);
-        }
-      }
-    } catch (error) {
-      console.log(error);
-      logger.error('MA Z-Score alert check error:', error.message);
-    }
-  }
-
-  static async _checkAndSendPerAssetMAZScoreAlert(symbol, timeframe, zScoreVal, bars) {
-    if (!this.db || !this.telegramService) return;
-
-    try {
-      const threshold = this.MAZSCORE_PER_ASSET_THRESHOLD;
-      const key = `${symbol}:${timeframe}`;
-      const prevZScore = this.lastMAZScorePerAsset.get(key);
-      this.lastMAZScorePerAsset.set(key, zScoreVal);
-
-      if (prevZScore === undefined) return;
-
-      let signalType = null;
-      if (prevZScore <= threshold && zScoreVal > threshold) {
-        signalType = 'bullish';
-      } else if (prevZScore >= -threshold && zScoreVal < -threshold) {
-        signalType = 'bearish';
-      }
-
-      if (signalType) {
-        this.lastMAZScoreExtreme.set(key, signalType);
-        await this.db.upsertScreenerSnapshot(symbol, timeframe, 'mazscore_extreme', signalType);
-
-        const lastBar = bars[bars.length - 1];
-        const price = lastBar ? lastBar.close : 0;
-        const timestamp = lastBar?.timestamp || new Date().toISOString();
-
-        const payload = {
-          symbol,
-          timeframe,
-          indicatorType: 'MAZSCORE',
-          signal: signalType,
-          price: zScoreVal,
-          exchange: this.currentExchange,
-          isTestnet: false,
-          timestamp,
-        };
-
-        const { userIds: subscribers, hasAnySubscriptions } = await this._getMazscoreAssetSubscribers(symbol, timeframe);
-
-        if (subscribers.length > 0) {
-          for (const userId of subscribers) {
-            await this.telegramService.sendNotification(userId, 'screener_reversal', payload);
-          }
-        }
-
-        logger.info(`MA Z-Score per-asset alert: ${symbol} ${timeframe} ${signalType}, z=${zScoreVal.toFixed(4)}, prev=${prevZScore.toFixed(4)}`);
-      }
-    } catch (error) {
-      logger.error(`MA Z-Score per-asset alert error for ${symbol} ${timeframe}:`, error.message);
-    }
-  }
-
-  static _getNonMetalSymbols() {
-    if (this.nonMetalSymbols) return this.nonMetalSymbols;
-
-    const path = require('path');
-    const fs = require('fs');
-    const { getProjectRoot } = require('../config');
-    const symbolsConfigPath = path.resolve(getProjectRoot(), 'src/config/symbols/assets.json');
-    const symbolsConfig = JSON.parse(fs.readFileSync(symbolsConfigPath, 'utf8'));
-    const allSymbols = new Set(symbolsConfig.assets
-      .filter(a => a.provider === 'bybit')
-      .map(a => a.symbol_ccxt));
-    this.nonMetalSymbols = new Set([...allSymbols].filter(s => !METAL_SYMBOLS.has(s) && !s.startsWith('XYZ')));
-    return this.nonMetalSymbols;
-  }
-
-  static async populateMAZScoreSnapshot(candleProvider) {
-    if (!this.db) return;
-
-    try {
-      const allCandles = candleProvider.getAllClosedCandles();
-      const symbolsConfigPath = require('path').resolve(
-        require('../config').getProjectRoot(),
-        'src/config/symbols/assets.json'
-      );
-      const symbolsConfig = JSON.parse(require('fs').readFileSync(symbolsConfigPath, 'utf8'));
-      const intervals = symbolsConfig.intervals;
-      const allSymbols = symbolsConfig.assets
-        .filter(a => a.provider === 'bybit')
-        .map(a => a.symbol_ccxt);
-
-      this._getNonMetalSymbols();
-
-      logger.info(`Populating initial MA Z-Score snapshot for ${allSymbols.length} symbols x ${intervals.length} timeframes...`);
-
-      let count = 0;
-      for (const symbol of allSymbols) {
-        for (const timeframe of intervals) {
-          // Skip m1 screener to avoid excessive noise
-          if (timeframe === 'm1') continue;
-
-          const key = `${symbol}:${timeframe}`;
-          const candles = allCandles.get(key);
-          if (!candles || candles.length < 20) {
-            await this.db.upsertScreenerSnapshot(symbol, timeframe, 'mazscore', null);
-            continue;
-          }
-
-          const parsed = CandleUtils.parseExchangeCandles(candles);
-          if (parsed.length < 20) {
-            await this.db.upsertScreenerSnapshot(symbol, timeframe, 'mazscore', null);
-            continue;
-          }
-
-          const result = IndicatorService.checkCondition('mazscore', parsed, { emaLength: 50, atrLength: 14, lookbackLength: 200 });
-          if (result.met && result.signal && result.signal !== 'none') {
-            const zScoreVal = parseFloat(result.signal);
-            await this.db.upsertScreenerSnapshot(symbol, timeframe, 'mazscore', result.signal);
-            this.lastMAZScorePerAsset.set(key, zScoreVal);
-            if (timeframe === 'm15') {
-              this.m15ZScoreMap.set(symbol, zScoreVal);
-            }
-          } else {
-            await this.db.upsertScreenerSnapshot(symbol, timeframe, 'mazscore', null);
-          }
-          count++;
-        }
-      }
-
-      const m15Values = [...this.m15ZScoreMap.values()];
-      if (m15Values.length > 0) {
-        this.lastMAZScoreAvg = m15Values.reduce((a, b) => a + b, 0) / m15Values.length;
-      }
-
-      logger.info(`Initial MA Z-Score snapshot populated for ${count} symbol/timeframe combinations`);
-
-      const extremeRows = await this.db.getScreenerSnapshots('mazscore_extreme');
-      for (const row of extremeRows) {
-        this.lastMAZScoreExtreme.set(`${row.symbol}:${row.timeframe}`, row.signal);
-      }
-      const avgExtremeRows = await this.db.getScreenerSnapshots('mazscore_avg_extreme');
-      if (avgExtremeRows.length > 0) {
-        this.lastMAZScoreAvgExtreme = avgExtremeRows[0].signal;
-      }
-      logger.info(`Loaded ${extremeRows.length} per-asset extremes, avg extreme: ${this.lastMAZScoreAvgExtreme}`);
-    } catch (error) {
-      logger.error('Failed to populate initial MA Z-Score snapshot:', error.message);
-    }
-  }
 }
+
+module.exports = AllAssetsScreenerService;
 
 module.exports = AllAssetsScreenerService;

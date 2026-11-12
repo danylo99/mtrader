@@ -194,25 +194,3 @@ CREATE TABLE IF NOT EXISTS price_alarms (
 );
 CREATE INDEX IF NOT EXISTS idx_price_alarms_user ON price_alarms(user_id);
 CREATE INDEX IF NOT EXISTS idx_price_alarms_lookup ON price_alarms(symbol, timeframe);
-
--- Per-user MA Z-Score timeframe subscriptions
-CREATE TABLE IF NOT EXISTS mazscore_tf_subscriptions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  timeframe TEXT NOT NULL,
-  enabled INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT DEFAULT (datetime('now')),
-  UNIQUE(user_id, timeframe)
-);
-CREATE INDEX IF NOT EXISTS idx_mazscore_tf_user ON mazscore_tf_subscriptions(user_id);
-
--- Per-user MA Z-Score asset subscriptions
-CREATE TABLE IF NOT EXISTS mazscore_asset_subscriptions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  symbol TEXT NOT NULL,
-  enabled INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT DEFAULT (datetime('now')),
-  UNIQUE(user_id, symbol)
-);
-CREATE INDEX IF NOT EXISTS idx_mazscore_asset_user ON mazscore_asset_subscriptions(user_id);

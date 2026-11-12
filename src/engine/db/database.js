@@ -137,8 +137,6 @@ class Database {
       await this.runEwFastBreakAssetSubscriptionsMigration();
       // Run price alarms migration
       await this.runPriceAlarmsMigration();
-      // Run MA Z-Score subscriptions migration
-      await this.runMazscoreSubscriptionsMigration();
       // Run SuperTrend subscriptions migration
       await this.runSupertrendSubscriptionsMigration();
       // Run BE activated migration
@@ -199,16 +197,6 @@ class Database {
       await migration.runMigration();
     } catch (error) {
       logger.error('Price alarms migration failed:', error);
-    }
-  }
-
-  async runMazscoreSubscriptionsMigration() {
-    try {
-      const Migration = require('./migrate_mazscore_subscriptions');
-      const migration = new Migration(this);
-      await migration.runMigration();
-    } catch (error) {
-      logger.error('MA Z-Score subscriptions migration failed:', error);
     }
   }
 
@@ -633,59 +621,6 @@ async getExchangeAccountByIndex(index) {
     for (const sym of symbols) {
       await this.run(
         'INSERT INTO ew_fast_break_asset_subscriptions (user_id, symbol, enabled) VALUES (?, ?, 1)',
-        [userId, sym]
-      );
-    }
-  }
-
-  async getMazscoreTfSubscriptionsByUser(userId) {
-    const sql = `
-      SELECT timeframe, enabled FROM mazscore_tf_subscriptions
-      WHERE user_id = ? AND enabled = 1
-    `;
-    return this.all(sql, [userId]);
-  }
-
-  async getEnabledMazscoreTfSubscribers() {
-    const sql = `
-      SELECT user_id, timeframe FROM mazscore_tf_subscriptions WHERE enabled = 1
-    `;
-    return this.all(sql);
-  }
-
-  async replaceMazscoreTfSubscriptionsForUser(userId, timeframes) {
-    await this.run('DELETE FROM mazscore_tf_subscriptions WHERE user_id = ?', [userId]);
-    for (const tf of timeframes) {
-      await this.run(
-        'INSERT INTO mazscore_tf_subscriptions (user_id, timeframe, enabled) VALUES (?, ?, 1)',
-        [userId, tf]
-      );
-    }
-  }
-
-  async getMazscoreAssetSubscriptionsByUser(userId) {
-    const sql = `
-      SELECT symbol, enabled FROM mazscore_asset_subscriptions
-      WHERE user_id = ? AND enabled = 1
-    `;
-    return this.all(sql, [userId]);
-  }
-
-  async getEnabledMazscoreAssetSubscribers() {
-    const sql = `
-      SELECT ast.user_id, ast.symbol, tf.timeframe
-      FROM mazscore_asset_subscriptions ast
-      JOIN mazscore_tf_subscriptions tf ON ast.user_id = tf.user_id
-      WHERE ast.enabled = 1 AND tf.enabled = 1
-    `;
-    return this.all(sql);
-  }
-
-  async replaceMazscoreAssetSubscriptionsForUser(userId, symbols) {
-    await this.run('DELETE FROM mazscore_asset_subscriptions WHERE user_id = ?', [userId]);
-    for (const sym of symbols) {
-      await this.run(
-        'INSERT INTO mazscore_asset_subscriptions (user_id, symbol, enabled) VALUES (?, ?, 1)',
         [userId, sym]
       );
     }

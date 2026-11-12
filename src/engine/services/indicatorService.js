@@ -4,7 +4,6 @@ const SuperTrend = require('./indicators/superTrend');
 const MacdEma = require('./indicators/macdEma');
 const Candlestick = require('./indicators/candlestick');
 const EWT = require('./indicators/ewt');
-const MAZScore = require('./indicators/mazscore');
 const Helpers = require('./indicators/helpers');
 const PriceLevel = require('./indicators/priceLevel');
 
@@ -36,8 +35,6 @@ class IndicatorService {
           return MacdEma.checkEMA(candles, params);
         case 'candlestick':
           return Candlestick.checkCandlestickPattern(candles, params.patternType);
-        case 'mazscore':
-          return MAZScore.checkMAZScore(candles, params);
         case 'pricelevel':
           return PriceLevel.checkPriceLevel(candles, params);
         default:
@@ -109,7 +106,6 @@ class IndicatorService {
         extMultiplier: 1.27,
         fastBreakMode: 'Only Once per Synth Dir',
       },
-      'mazscore': { emaLength: 50, atrLength: 14, lookbackLength: 200 },
       'pricelevel': { priceLevel: 0 },
     };
 
@@ -143,7 +139,7 @@ class IndicatorService {
   }
 
   static validateIndicatorConfig(indicatorType, timeframe) {
-    const validIndicators = ['supertrend', 'rollingsupertrend', 'rollingsupertrend2', 'rollingsupertrend2stop', 'macd', 'ema', 'ewt', 'mazscore', 'pricelevel'];
+    const validIndicators = ['supertrend', 'rollingsupertrend', 'rollingsupertrend2', 'rollingsupertrend2stop', 'macd', 'ema', 'ewt', 'pricelevel'];
     const validTimeframes = ['m1', 'm5', 'm15', 'm30', 'h1', 'h2', 'h4', 'd1', 'w1'];
 
     if (!validIndicators.includes(this._normalizeType(indicatorType))) {

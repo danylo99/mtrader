@@ -302,34 +302,6 @@ async createUser(email, passwordHash, timeoutMs) {
     }, timeoutMs);
   }
 
-  async getMazscoreTfSubscriptionsByUser(userId) {
-    return this.db.getMazscoreTfSubscriptionsByUser(userId);
-  }
-
-  async getEnabledMazscoreTfSubscribers() {
-    return this.db.getEnabledMazscoreTfSubscribers();
-  }
-
-  async replaceMazscoreTfSubscriptionsForUser(userId, timeframes, timeoutMs) {
-    return this.runWriteOperation('replaceMazscoreTfSubscriptionsForUser', async () => {
-      return this.db.replaceMazscoreTfSubscriptionsForUser(userId, timeframes);
-    }, timeoutMs);
-  }
-
-  async getMazscoreAssetSubscriptionsByUser(userId) {
-    return this.db.getMazscoreAssetSubscriptionsByUser(userId);
-  }
-
-  async getEnabledMazscoreAssetSubscribers() {
-    return this.db.getEnabledMazscoreAssetSubscribers();
-  }
-
-  async replaceMazscoreAssetSubscriptionsForUser(userId, symbols, timeoutMs) {
-    return this.runWriteOperation('replaceMazscoreAssetSubscriptionsForUser', async () => {
-      return this.db.replaceMazscoreAssetSubscriptionsForUser(userId, symbols);
-    }, timeoutMs);
-  }
-
   async getPriceAlarmsByUser(userId) {
     return this.db.getPriceAlarmsByUser(userId);
   }

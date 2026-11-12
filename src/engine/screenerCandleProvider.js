@@ -117,7 +117,6 @@ class ScreenerCandleProvider {
       await this.candleProvider.waitForHistorical();
 
       await AllAssetsScreenerService.populateInitialSnapshot(this.candleProvider);
-      await AllAssetsScreenerService.populateMAZScoreSnapshot(this.candleProvider);
 
     } catch (error) {
       logger.error('Failed to start Screener CandleProvider:', error);

@@ -65,7 +65,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/dashboard/screener-supertrend', label: 'RollingSuperTrend2', icon: Search },
     { href: '/dashboard/screener-ew-fast-break', label: 'EW Fast Break', icon: Zap },
-    { href: '/dashboard/screener-mazscore', label: 'MA Z-Score', icon: Search },
     { href: '/dashboard/alarms', label: 'Price Alarms', icon: Bell },
     { href: '/dashboard/assets', label: 'Assets', icon: List },
     { href: '/dashboard/chat', label: 'Live Prices', icon: MessageCircle },
@@ -193,13 +192,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             }`}>
             <Zap className="h-4 w-4" />
             EW Fast Break
-          </Link>
-          <Link href="/dashboard/screener-mazscore"
-            className={`mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-              pathname.startsWith('/dashboard/screener-mazscore') ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'
-            }`}>
-            <Search className="h-4 w-4" />
-            MA Z-Score
           </Link>
           <Link href="/dashboard/alarms"
             className={`mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${

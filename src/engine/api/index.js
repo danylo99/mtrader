@@ -12,7 +12,6 @@ router.use('/screener-status', require('./routes/screenerStatus'));
 router.use('/webhook', require('./routes/webhook'));
 router.use('/symbols', require('./routes/symbols'));
 router.use('/ew-fast-break-subscriptions', require('./routes/ewFastBreakSubscriptions'));
-router.use('/mazscore-subscriptions', require('./routes/mazscoreSubscriptions'));
 router.use('/supertrend-subscriptions', require('./routes/supertrendSubscriptions'));
 router.use('/price-alarms', require('./routes/priceAlarms'));
 router.use('/candles', require('./routes/candles'));
