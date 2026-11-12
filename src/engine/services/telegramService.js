@@ -182,6 +182,10 @@ class TelegramService {
   formatBatchMessage(messageType, data) {
     const payload = data || {};
 
+    if (messageType === 'screener_fast_break') {
+      return this.formatScreenerFastBreak(payload);
+    }
+
     if (this.constructor.SCREENER_MESSAGE_TYPES.has(messageType)) {
       return this.formatScreenerReversal(payload);
     }
