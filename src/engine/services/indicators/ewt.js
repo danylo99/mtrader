@@ -308,30 +308,6 @@ function checkEWT(candles, params = {}) {
       sl_price = prevExtremePrice !== null ? Math.min(prevExtremePrice, lastSynthStLine) : lastSynthStLine;
     }
 
-    // For entry source: signal on last bar if condition is currently met
-    // (break happened + fast + aligned), even if already signaled before.
-    // Without this, once hasSignaledCurrentSynthDir is set, subsequent bars
-    // within the same local leg return met=false even though break/align
-    // details show the condition is still satisfied.
-    const breakTimingNow = breakDetectedTime !== null && prevLegFormingTime !== null
-      ? (breakDetectedTime < prevLegFormingTime ? 'fast' : 'slow')
-      : 'n/a';
-    const alignStatusNow = synthDirArr[lastIdx] === localDir ? 'aligned' : 'not_aligned';
-    if (source === 'entry' && !met && breakDoneInLocalLeg && breakTimingNow === 'fast' && alignStatusNow === 'aligned') {
-      const lastSynthDir = synthDirArr[lastIdx];
-      if (lastSynthDir === localDir) {
-        if (lastSynthDir === -1) {
-          met = true;
-          signal = 'fast_break_bullish';
-          sl_price = prevExtremePrice !== null ? Math.max(prevExtremePrice, lastSynthStLine) : lastSynthStLine;
-        } else if (lastSynthDir === 1) {
-          met = true;
-          signal = 'fast_break_bearish';
-          sl_price = prevExtremePrice !== null ? Math.min(prevExtremePrice, lastSynthStLine) : lastSynthStLine;
-        }
-      }
-    }
-
     const result = {
       met,
       signal,
