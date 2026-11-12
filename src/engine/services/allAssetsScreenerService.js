@@ -2,7 +2,6 @@ const logger = require('../logger');
 const IndicatorService = require('./indicatorService');
 const CandleUtils = require('../utils/candleUtils');
 const { _calculateSuperTrendAligned } = require('./indicators/helpers');
-const EntryService = require('./entryService');
 
 const METAL_SYMBOLS = new Set([
   'PAXG/USDT:USDT',
@@ -336,23 +335,6 @@ static async _updateSTDirection(symbol, timeframe, bars) {
         }
 
         this.lastEWSignals.set(key, ewResult.signal);
-
-        // Trigger entry for user setups using EWT fast break as entry condition
-        // on the exact bar where break+alignment first occurred (met === true).
-        if (isFastBreak && this.db) {
-          try {
-            const setups = await this.db.getTriggeredSetupsForSymbolTimeframe(symbol, timeframe);
-            const entrySetups = setups.filter(s => {
-              const type = String(s.entry_indicator_type || '').toLowerCase().replace('ewtrading', 'ewt');
-              return type === 'ewt' && s.status === 'triggered';
-            });
-            for (const setup of entrySetups) {
-              await EntryService.processTriggeredSetup(setup, bars);
-            }
-          } catch (err) {
-            logger.error(`Failed to trigger EWT fast break entries for ${symbol} ${timeframe}:`, err.message);
-          }
-        }
       }
     }
   }
